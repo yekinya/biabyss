@@ -34,7 +34,7 @@ Codemagic 설정과 signing secret은 실제 Apple/Google 개발자 계정이 �
 ## 4. 빌드 원칙
 
 1. Node와 package lock으로 web build를 재현한다.
-2. `npm run build` 산출물을 Capacitor `webDir`에 sync한다.
+2. `biabyss-apps/`에서 `npm run build`한 mobile 산출물을 Capacitor `webDir`에 sync한다.
 3. 같은 commit SHA에서 iOS와 Android를 만든다.
 4. signing은 CI secret store에서 수행한다.
 5. `.p8`, certificate, provisioning profile, keystore와 비밀번호를 Git에 저장하지 않는다.

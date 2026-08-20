@@ -41,7 +41,7 @@ shell → application → simulation → domain
 ## 3. 목표 소스 구조
 
 ```text
-src/
+biabyss-apps/apps/mobile/src/
 ├── app/
 ├── domain/
 │   ├── model/
@@ -66,8 +66,8 @@ src/
 └── test/
 ```
 
-현재 `BiabyssGame.ts` 단일 prototype은 이 목표 구조로 가기 전의 실행형 기준선이다. 새 기능을 계속 한 파일에
-추가하지 않고 첫 simulation SPEC에서 분리한다.
+현재 `biabyss-apps/apps/mobile/src/game/engine/BiabyssGame.ts` 단일 prototype은 이 목표 구조로 가기 전의
+실행형 기준선이다. 새 기능을 계속 한 파일에 추가하지 않고 첫 simulation SPEC에서 분리한다.
 
 ## 4. 런타임 흐름
 
@@ -86,8 +86,8 @@ render ticker의 delta를 곧바로 게임 판정 dt로 사용하지 않는다. 
 
 ## 5. 네이티브 패키징
 
-Vite `dist/`를 Capacitor `webDir`로 포함한다. iOS는 WKWebView, Android는 platform WebView에서 같은 bundle을
-실행한다. Native project는 빌드·서명·아이콘·splash와 승인 plugin만 담당한다.
+`biabyss-apps/apps/mobile/dist/`를 Capacitor `webDir`로 포함한다. iOS는 WKWebView, Android는 platform
+WebView에서 같은 bundle을 실행한다. Native project는 빌드·서명·아이콘·splash와 승인 plugin만 담당한다.
 
 게임 코드가 `Capacitor.isNativePlatform()` 분기를 곳곳에 만들지 않도록 adapter interface를 주입한다.
 

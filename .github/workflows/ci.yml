@@ -29,20 +29,14 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version-file: .nvmrc
+          node-version-file: biabyss-apps/.nvmrc
           cache: npm
+          cache-dependency-path: biabyss-apps/package-lock.json
 
       - name: Install locked dependencies
+        working-directory: biabyss-apps
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Test
-        run: npm run test
-
-      - name: Build web bundle
-        run: npm run build
+      - name: Check mobile workspace
+        working-directory: biabyss-apps
+        run: npm run check

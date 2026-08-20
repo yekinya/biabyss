@@ -1,5 +1,7 @@
 # BIABYSS 웹·Canvas 코딩 가이드
 
+> 대상: `biabyss-apps/apps/mobile/`
+
 ## 1. 기술 기준선
 
 - Vite
