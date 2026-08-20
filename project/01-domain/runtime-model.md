@@ -92,7 +92,7 @@ interface NpcBrainState {
 
 - `EntityId`: Run ID와 증가 sequence로 생성하는 안정 식별자
 - `Vec2`: 유한한 x/y 값
-- `InputIntent`: world target, 입력 활성 여부, 발생 sequence
+- `InputIntent`: world target, `0..1` 조이패드 강도, 입력 활성 여부, 발생 sequence
 - `SimulationSnapshot`: HUD와 renderer가 읽는 불변 투영
 - `RunResult`: duration, finalMass, score, absorbedCount, deathCause, seed
 - `RenderTier`: `low | medium | high`

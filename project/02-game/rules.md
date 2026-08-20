@@ -21,6 +21,8 @@ interface RuleSet {
     maxSpeed: number
     wriggleAmplitude: number
     wriggleFrequency: number
+    strideMinimum: number
+    joystickRadiusCssPx: number
   }
   mass: {
     radiusScale: number
@@ -54,8 +56,10 @@ interface RuleSet {
 | `player.startProtectionMs` | 6000 |
 | `world.viewportSpanMultiplier` | 6 |
 | `world.viewportAreaMultiplier` | 36 |
-| `player.wriggleAmplitude` | 22 |
+| `player.wriggleAmplitude` | 25 |
 | `player.wriggleFrequency` | 2.4 Hz |
+| `player.strideMinimum` | 0.22 |
+| `player.joystickRadiusCssPx` | 72 |
 | `mass.radiusScale` | 4 |
 | `mass.cellAbsorbRatio` | 1.12 |
 | `mass.nutrientEfficiency` | 1.0 |
@@ -77,20 +81,28 @@ radius(mass) = sqrt(mass) × radiusScale
 
 ## 3. 입력과 이동
 
-입력은 현재 위치가 아니라 목표 world 좌표를 전달한다.
+입력 adapter는 첫 pointer가 눌린 Canvas CSS 좌표를 조이패드 중심으로 고정한다. 포인터 변위를
+`joystickRadiusCssPx` 안으로 clamp하고, 중심에서 가장자리까지의 비율을 `inputStrength ∈ [0, 1]`로 만든 뒤
+방향과 함께 목표 world 좌표로 전달한다. 포인터가 반지름 밖으로 나가도 방향은 유지하고 강도만 1로 제한한다.
 
 ```text
 desired = normalize(target - position)
 massFactor = sqrt(initialMass / currentMass)
 side = perpendicular(desired) × sin(elapsed × wriggleFrequency + phase)
-acceleration = (desired × playerAcceleration + side × wriggleAmplitude) × massFactor
-velocity = clampMagnitude((velocity + acceleration × dt) × drag, maxSpeed × massFactor)
+stride = strideMinimum + (1 - strideMinimum) × (0.5 + 0.5 × sin(elapsed × wriggleFrequency + phase))
+acceleration = (desired × playerAcceleration × stride + side × wriggleAmplitude) × inputStrength × massFactor
+speedLimit = maxSpeed × (0.35 + 0.65 × inputStrength) × massFactor
+velocity = clampMagnitude((velocity + acceleration × dt) × drag, speedLimit)
 position = position + velocity × dt
 ```
 
 - 목표까지의 거리가 dead zone 안이면 추가 가속하지 않는다.
+- `stride`는 한 주기 안에서 앞부분이 뻗고 뒤가 따라붙는 간헐 추진을 만든다. 렌더러는 같은 주기의
+  늘어남·복원을 표현할 수 있지만 충돌 반경과 이동 결과를 바꾸지 않는다.
+- 조이패드 강도는 한 번의 추진에서 이동하는 거리와 속도 상한에 함께 반영한다.
 - wriggle은 등속 직선 이동을 깨는 횡가속이며 seed로 정한 phase를 사용한다.
 - touch와 mouse는 같은 `InputIntent`로 정규화한다.
+- 첫 active pointer만 조이패드를 소유한다. `pointerup`, `pointercancel`, blur와 visibility change에서 즉시 해제한다.
 - 화면 밖 pointer는 가장 가까운 world 경계 좌표로 clamp한다.
 - resize 중 입력 좌표가 이전 viewport 기준으로 남지 않게 다시 계산한다.
 

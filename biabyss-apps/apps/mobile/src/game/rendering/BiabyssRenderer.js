@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import microscopeFieldUrl from '../../assets/images/microscope-field-v1.png?url'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { CellRenderer } from './CellRenderer.js'
+import { JoystickRenderer } from './JoystickRenderer.js'
 import {
   AmbientParticles,
   FluidTrails,
@@ -23,7 +24,10 @@ export class BiabyssRenderer {
     this.simulation = simulation
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0x01070b)
+    this.overlayScene = new THREE.Scene()
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
+    this.overlayCamera = new THREE.OrthographicCamera(0, 1, 1, 0, 0.1, 20)
+    this.overlayCamera.position.z = 10
     this.camera.position.set(simulation.player.x, simulation.player.y, 100)
     this.camera.lookAt(simulation.player.x, simulation.player.y, 0)
     this.renderer = new THREE.WebGLRenderer({
@@ -35,6 +39,7 @@ export class BiabyssRenderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.08
+    this.renderer.autoClear = false
     this.renderer.domElement.dataset.engine = 'three-webgl'
     this.host.replaceChildren(this.renderer.domElement)
 
@@ -42,7 +47,17 @@ export class BiabyssRenderer {
     this.viewportHeight = 1
     this.pixelRatio = 1
     this.frame = 0
+    this.drawCalls = 0
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    /** @type {import('./JoystickRenderer.js').JoystickViewState} */
+    this.joystickState = {
+      active: false,
+      centerX: 0,
+      centerY: 0,
+      knobX: 0,
+      knobY: 0,
+      strength: 0,
+    }
     this.texture = new THREE.TextureLoader().load(microscopeFieldUrl)
     this.texture.colorSpace = THREE.SRGBColorSpace
     this.texture.wrapS = THREE.RepeatWrapping
@@ -76,9 +91,15 @@ export class BiabyssRenderer {
     this.nutrientParticles = new NutrientParticles(this.scene, 1)
     this.internalParticles = new InternalParticles(this.scene, simulation.cells.length, 1)
     this.trails = new FluidTrails(this.scene, 1)
+    this.joystick = new JoystickRenderer(this.overlayScene, this.reducedMotion)
 
     this.renderPass = new RenderPass(this.scene, this.camera)
-    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), this.reducedMotion ? 0.42 : 0.84, 0.64, 0.42)
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(1, 1),
+      this.reducedMotion ? 0.28 : 0.58,
+      0.48,
+      0.62,
+    )
     this.outputPass = new OutputPass()
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(this.renderPass)
@@ -124,6 +145,11 @@ export class BiabyssRenderer {
     this.camera.top = this.viewportHeight / 2
     this.camera.bottom = -this.viewportHeight / 2
     this.camera.updateProjectionMatrix()
+    this.overlayCamera.left = 0
+    this.overlayCamera.right = this.viewportWidth
+    this.overlayCamera.top = this.viewportHeight
+    this.overlayCamera.bottom = 0
+    this.overlayCamera.updateProjectionMatrix()
     this.composer.setPixelRatio(this.pixelRatio)
     this.composer.setSize(this.viewportWidth, this.viewportHeight)
     this.bloomPass.setSize(this.viewportWidth, this.viewportHeight)
@@ -154,6 +180,19 @@ export class BiabyssRenderer {
     this.trails.update(dt)
     this.followPlayer(dt)
     this.composer.render(dt)
+    this.drawCalls = this.renderer.info.render.calls
+    this.joystick.update(this.joystickState, this.viewportHeight, time)
+    this.renderer.clearDepth()
+    this.renderer.render(this.overlayScene, this.overlayCamera)
+  }
+
+  /** @param {import('./JoystickRenderer.js').JoystickViewState} state */
+  setJoystick(state) {
+    this.joystickState = { ...state }
+  }
+
+  hideJoystick() {
+    this.joystickState.active = false
   }
 
   /** @param {number} dt */
@@ -201,7 +240,9 @@ export class BiabyssRenderer {
       cells: this.simulation.cells.length,
       nutrients: this.simulation.nutrients.length,
       trailCapacity: RULE_SET.rendering.trailCapacity,
-      drawCalls: this.renderer.info.render.calls,
+      drawCalls: this.drawCalls,
+      joystickActive: this.joystickState.active,
+      joystickStrength: this.joystickState.strength,
     }
   }
 
@@ -224,6 +265,7 @@ export class BiabyssRenderer {
     this.nutrientParticles.dispose()
     this.internalParticles.dispose()
     this.trails.dispose()
+    this.joystick.dispose()
     this.fieldGeometry.dispose()
     this.fieldMaterial.dispose()
     this.texture.dispose()

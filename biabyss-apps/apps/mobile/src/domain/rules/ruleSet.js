@@ -17,6 +17,8 @@ export const RULE_SET = Object.freeze({
     deadZone: 10,
     wriggleAmplitude: 25,
     wriggleFrequency: 2.4,
+    strideMinimum: 0.22,
+    joystickRadiusCssPx: 72,
   }),
   mass: Object.freeze({
     radiusScale: 4,
@@ -43,7 +45,7 @@ export const RULE_SET = Object.freeze({
   rendering: Object.freeze({
     dprMaximum: 1.5,
     ambientParticles: 1800,
-    internalParticlesPerCell: 5,
+    internalParticlesPerCell: 8,
     trailCapacity: 640,
     trailLifetimeSeconds: 1.75,
   }),

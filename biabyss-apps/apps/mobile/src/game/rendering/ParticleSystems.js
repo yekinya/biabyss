@@ -136,17 +136,25 @@ export class InternalParticles {
       const x = THREE.MathUtils.lerp(cell.previousX, cell.x, alpha)
       const y = THREE.MathUtils.lerp(cell.previousY, cell.y, alpha)
       const radius = Math.sqrt(cell.mass) * RULE_SET.mass.radiusScale
+      const speed = Math.hypot(cell.vx, cell.vy)
+      const inertiaScale = Math.min(radius * 0.18, speed * 0.045)
+      const inertiaX = speed > 0 ? (-cell.vx / speed) * inertiaScale : 0
+      const inertiaY = speed > 0 ? (-cell.vy / speed) * inertiaScale : 0
       this.color.setHSL(cell.kind === 'player' ? 0.49 : cell.hue, 0.78, 0.72)
       for (let localIndex = 0; localIndex < this.perCell; localIndex += 1) {
-        const angle = time * (0.22 + localIndex * 0.035) + cell.phase + localIndex * 2.17
-        const orbit = radius * (0.2 + (localIndex % 3) * 0.11)
+        const spread =
+          0.68 + 0.3 * (0.5 + Math.sin(time * (0.72 + localIndex * 0.031) + cell.phase + localIndex) * 0.5)
+        const angle =
+          time * (0.28 + localIndex * 0.028) + cell.phase + localIndex * 2.17 + spread * 0.75
+        const orbit = radius * (0.1 + (localIndex % 4) * 0.085) * spread
+        const twinkle = 0.5 + Math.sin(time * (2.7 + localIndex * 0.17) + cell.phase * 2 + localIndex) * 0.5
         this.buffer.set(
           particleIndex,
-          x + Math.cos(angle) * orbit,
-          y + Math.sin(angle * 1.13) * orbit,
+          x + inertiaX + Math.cos(angle) * orbit,
+          y + inertiaY + Math.sin(angle * 1.13) * orbit * 0.82,
           5,
-          cell.kind === 'player' ? 4.2 : 2.7,
-          cell.kind === 'player' ? 0.66 : 0.42,
+          (cell.kind === 'player' ? 4.8 : 3.1) * (0.72 + twinkle * 0.48),
+          (cell.kind === 'player' ? 0.7 : 0.44) * (0.55 + twinkle * 0.45),
           this.color,
         )
         particleIndex += 1

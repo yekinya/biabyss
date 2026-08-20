@@ -7,6 +7,8 @@
 | `shader.world.fog.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | TECH_QA | bitmap + 단색 radial gradient | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.cell.membrane.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | TECH_QA | `MeshBasicMaterial` 원형 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.cell.cytoplasm.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | TECH_QA | 반투명 gradient | SPEC-BIABYSS-20260820-three-microscope-world |
+| `shader.cell.soft-locomotion.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 속도 기반 단순 타원 scale | SPEC-BIABYSS-20260820-soft-cell-locomotion |
+| `material.ui.joystick.v1` | procedural material | `biabyss-apps/apps/mobile/src/game/rendering/JoystickRenderer.js` | DRAFT | 입력은 유지하고 표시만 생략 | SPEC-BIABYSS-20260820-soft-cell-locomotion |
 | `shader.particle.fluid.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/particleShader.js` | TECH_QA | 원형 `PointsMaterial` | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.post.bloom.v1` | post-process | Three.js `UnrealBloomPass` | TECH_QA | emissive aura 없음 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `material.cell.player.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | cyan 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
