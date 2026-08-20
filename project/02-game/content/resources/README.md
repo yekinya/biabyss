@@ -3,12 +3,12 @@
 ## 1. 구현 위치
 
 ```text
-src/game/rendering/shaders/     # GLSL/WGSL과 uniform type
-src/game/rendering/materials/   # palette, shader 조합, fallback
-src/game/rendering/particles/   # particle emitter 설정
-public/assets/audio/            # 앱 번들 음향
-public/assets/fonts/            # 번들 폰트와 license
-public/assets/images/           # icon/splash 등 필요한 정적 이미지
+biabyss-apps/apps/mobile/src/game/rendering/shaders/     # GLSL/WGSL과 uniform type
+biabyss-apps/apps/mobile/src/game/rendering/materials/   # palette, shader 조합, fallback
+biabyss-apps/apps/mobile/src/game/rendering/particles/   # particle emitter 설정
+biabyss-apps/apps/mobile/public/assets/audio/            # 앱 번들 음향
+biabyss-apps/apps/mobile/public/assets/fonts/            # 번들 폰트와 license
+biabyss-apps/apps/mobile/public/assets/images/           # icon/splash 등 필요한 정적 이미지
 project/02-game/content/resources/
 └── asset-manifest.md           # 출처와 승인 상태 정본
 ```

@@ -18,36 +18,43 @@ HUD와 조작 UI도 단일 Canvas scene으로 이동합니다.
 
 ## 시작하기
 
-Node.js 22.13 이상이 필요합니다. `.nvmrc`에는 개발 기준 버전이 지정되어 있습니다.
+Node.js 22.13 이상이 필요합니다. 앱 workspace의 `.nvmrc`에 개발 기준 버전이 지정되어 있습니다.
 
 ```bash
+cd biabyss-apps
 nvm use
 npm install
-npm run dev
+npm run dev:mobile
 ```
 
 ## 명령어
 
 ```bash
-npm run dev        # 개발 서버
+npm run dev:mobile # 모바일 개발 서버
 npm run typecheck  # TypeScript 검사
 npm run lint       # ESLint 검사
 npm run test       # 단위 테스트
 npm run build      # 프로덕션 빌드
-npm run preview    # 빌드 결과 미리보기
+npm run check      # 전체 필수 검사
 ```
 
 ## 주요 구조
 
 ```text
-src/
-├── game/
-│   ├── GameCanvas.tsx
-│   └── engine/BiabyssGame.ts
-├── store/gameStore.ts
-├── App.tsx
-├── main.tsx
-└── styles.css
+biabyss/
+├── biabyss-apps/
+│   ├── package.json
+│   └── apps/
+│       └── mobile/
+│           ├── package.json
+│           ├── src/
+│           │   ├── game/
+│           │   ├── domain/
+│           │   └── store/
+│           └── vite.config.ts
+├── project/
+├── AGENTS.md
+└── CLAUDE.md
 ```
 
 현재 베이스 장면에는 포인터 이동, 질량 증가, 먹기/피식 판정, 단순 NPC 조향과 반응형 HUD가 포함되어 있습니다.

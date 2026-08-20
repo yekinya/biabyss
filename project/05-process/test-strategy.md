@@ -8,6 +8,7 @@ frame rate와 기기가 달라도 같은 규칙이 적용되고, Canvas가 실�
 ## 2. Q1 — 모든 PR 필수
 
 ```bash
+cd biabyss-apps
 npm ci
 npm run typecheck
 npm run lint

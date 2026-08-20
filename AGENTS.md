@@ -6,6 +6,9 @@
 배포하는 2D Canvas 생존 게임이다. 현재 제품 경계는 로컬 플레이어 1명과 NPC 군집이며, 서버·계정·실시간
 사람 멀티플레이는 승인된 별도 SPEC이 생기기 전까지 범위 밖이다.
 
+실행 프로젝트는 반드시 `biabyss-apps/apps/mobile/` 아래에 둔다. `biabyss-apps/`는 npm workspace
+root이고 저장소 root에는 실행 앱의 `src`, `package.json`, Vite·TypeScript 설정을 두지 않는다.
+
 상세 개발·검증·Git 절차는 [`project/05-process/agent-rules.md`](project/05-process/agent-rules.md)가
 규정한다.
 
@@ -68,6 +71,7 @@
 최소 필수 검사는 다음과 같다.
 
 ```bash
+cd biabyss-apps
 npm run typecheck
 npm run lint
 npm run test

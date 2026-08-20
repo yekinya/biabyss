@@ -4,4 +4,4 @@ dist
 *.local
 *.log
 .vite
-
+.idea/
