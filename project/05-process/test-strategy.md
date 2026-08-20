@@ -57,7 +57,9 @@ shader time, particle 위치와 audio timing은 hash에서 제외한다.
 - WebGL context loss/restore 가능한 범위의 복구
 - console error/warning 0
 - runtime 외부 network 요청 0
-- React StrictMode 재마운트 뒤 Canvas/listener 중복 0
+- restart 뒤 Canvas/listener 중복 0
+- `EffectComposer`, bloom pass와 shader fallback 초기화
+- Field 면적 36배, camera clamp와 trail particle 수명
 
 시각 회귀는 대표 viewport와 render tier screenshot으로 비교하되, shader noise는 안정 seed 또는 mask를 사용한다.
 

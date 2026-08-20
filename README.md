@@ -5,16 +5,18 @@
 
 ## 기술 구성
 
-- React 19 + TypeScript
+- Pure JavaScript ES2022 + TypeScript `checkJs`
 - Vite 8
-- PixiJS 8 (WebGL 렌더링)
-- Zustand (메뉴와 HUD 상태)
+- Three.js WebGL + GLSL ShaderMaterial
+- EffectComposer + UnrealBloomPass
+- `THREE.Points` 기반 유체·내부·배경 particle
+- 단일 HTML production bundle
 - ESLint
 - Vitest
 
-현재 prototype은 React DOM으로 시작 화면과 HUD를 검증하고, 매 프레임 갱신되는 게임 상태와 렌더링은
-PixiJS 엔진 내부에서 처리합니다. 제품 구현에서는 `project/04-platform/canvas-hardrules.md`에 따라 시각
-HUD와 조작 UI도 단일 Canvas scene으로 이동합니다.
+viewport 면적의 36배인 Field를 직교 camera가 추적합니다. 세포막·세포질·뉴클레오이드와 과립은 GLSL로
+합성하고, DOM은 시작 화면과 저주파 HUD projection만 담당합니다. Three.js와 모든 자산은 앱 bundle에
+포함되어 runtime CDN에 의존하지 않습니다.
 
 ## 시작하기
 
@@ -57,14 +59,16 @@ biabyss/
 │           ├── src/
 │           │   ├── game/
 │           │   ├── domain/
-│           │   └── store/
-│           └── vite.config.ts
+│           │   ├── simulation/
+│           │   └── assets/
+│           └── vite.config.js
 ├── project/
 ├── AGENTS.md
 └── CLAUDE.md
 ```
 
-현재 베이스 장면에는 포인터 이동, 질량 증가, 먹기/피식 판정, 단순 NPC 조향과 반응형 HUD가 포함되어 있습니다.
+현재 장면에는 fixed-step 이동·흡수·포식, 54개 NPC, 320개 Nutrient, Field camera, 블룸, 세포 GLSL과
+감쇠형 유체 trail이 포함되어 있습니다.
 
 ## 프로젝트 문서
 

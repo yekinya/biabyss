@@ -36,6 +36,8 @@ BIABYSS는 빛나는 미생물 심연에서 하나의 세포를 조종해 더 �
 |---|---|
 | Run | 시작부터 소멸 또는 종료까지 한 번의 플레이 세션 |
 | World | Run 동안 Entity가 존재하는 유한한 2D 공간 |
+| Field | World의 물리 경계. Run 시작 viewport 가로·세로의 6배이며 면적은 36배다. |
+| Viewport | 카메라가 현재 Canvas에 투영하는 Field의 일부 영역 |
 | Cell | 질량·위치·속도·행동 주체를 가진 생명체 |
 | Player Cell | 사람의 Input Intent를 따르는 유일한 Cell |
 | NPC Cell | RuleSet과 감지 결과로 행동하는 Cell |
@@ -74,7 +76,7 @@ BOOT → READY → RUNNING ⇄ PAUSED → GAME_OVER
 5. 한 대상은 같은 tick에 두 번 흡수되지 않는다.
 6. 포식 결과는 렌더링 순서나 frame rate에 좌우되지 않는다.
 7. `GAME_OVER` 뒤 score, mass, world 결과는 재시작 전까지 변하지 않는다.
-8. NPC는 화면 밖으로 영구 이탈하지 않으며 spawn 즉시 Player와 충돌하지 않는다.
+8. NPC는 Field 밖으로 이탈하지 않으며 spawn 즉시 Player와 충돌하지 않는다.
 9. 모든 난수는 Run seed에서 나온다. 테스트에서 같은 seed와 입력은 같은 결과를 낸다.
 10. 일시정지와 resume은 숨은 질량 증가·NPC 순간 이동·즉시 사망을 만들지 않는다.
 

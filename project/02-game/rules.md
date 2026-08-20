@@ -9,13 +9,18 @@ Run 시작 시 하나의 불변 RuleSet을 선택한다. Run 도중 배포·설�
 interface RuleSet {
   id: string
   simulationHz: number
-  world: { width: number; height: number }
+  world: {
+    viewportSpanMultiplier: number
+    viewportAreaMultiplier: number
+  }
   player: {
     initialMass: number
     startProtectionMs: number
     acceleration: number
     dragPerSecond: number
     maxSpeed: number
+    wriggleAmplitude: number
+    wriggleFrequency: number
   }
   mass: {
     radiusScale: number
@@ -46,13 +51,17 @@ interface RuleSet {
 |---|---:|
 | `simulationHz` | 60 |
 | `player.initialMass` | 36 |
-| `player.startProtectionMs` | 2500 |
+| `player.startProtectionMs` | 6000 |
+| `world.viewportSpanMultiplier` | 6 |
+| `world.viewportAreaMultiplier` | 36 |
+| `player.wriggleAmplitude` | 22 |
+| `player.wriggleFrequency` | 2.4 Hz |
 | `mass.radiusScale` | 4 |
 | `mass.cellAbsorbRatio` | 1.12 |
 | `mass.nutrientEfficiency` | 1.0 |
 | `mass.cellEfficiency` | 0.28 |
-| `npc.count` | 10 |
-| `nutrient.targetCount` | 55 |
+| `npc.count` | 54 |
+| `nutrient.targetCount` | 320 |
 
 ## 2. 질량과 반경
 
@@ -73,19 +82,22 @@ radius(mass) = sqrt(mass) × radiusScale
 ```text
 desired = normalize(target - position)
 massFactor = sqrt(initialMass / currentMass)
-acceleration = desired × playerAcceleration × massFactor
+side = perpendicular(desired) × sin(elapsed × wriggleFrequency + phase)
+acceleration = (desired × playerAcceleration + side × wriggleAmplitude) × massFactor
 velocity = clampMagnitude((velocity + acceleration × dt) × drag, maxSpeed × massFactor)
 position = position + velocity × dt
 ```
 
 - 목표까지의 거리가 dead zone 안이면 추가 가속하지 않는다.
+- wriggle은 등속 직선 이동을 깨는 횡가속이며 seed로 정한 phase를 사용한다.
 - touch와 mouse는 같은 `InputIntent`로 정규화한다.
 - 화면 밖 pointer는 가장 가까운 world 경계 좌표로 clamp한다.
 - resize 중 입력 좌표가 이전 viewport 기준으로 남지 않게 다시 계산한다.
 
 ## 4. World 경계
 
-MVP World는 화면에 맞춰 보이는 유한 직사각형이다. Cell 중심이 반경보다 경계 밖으로 나가지 않는다.
+MVP World는 Run 시작 viewport 가로·세로의 6배인 유한 Field다. Cell 중심이 반경보다 Field 경계 밖으로
+나가지 않는다. Viewport는 Player를 추적하되 Field 경계를 넘어가지 않는다.
 
 경계 접촉 처리:
 
@@ -146,6 +158,7 @@ NPC가 Player만 인식하는 임시 구현은 prototype으로 표시한다. 최
 
 ## 8. Spawn 규칙
 
+- Field를 동일 크기의 cell로 나눈 stratified grid에 NPC와 Nutrient를 배치하고 각 cell 안에서 seed jitter를 준다.
 - Player 시작 위치에서 `safeSpawnDistance` 이상 떨어진 곳에 NPC를 만든다.
 - 새 NPC는 Player의 시작 보호 시간 동안 Player를 흡수할 수 없다.
 - spawn 후보가 기존 큰 Cell과 겹치면 제한 횟수만큼 다시 찾는다.
@@ -169,7 +182,7 @@ NPC가 Player만 인식하는 임시 구현은 prototype으로 표시한다. 최
 11. 게임오버 판정
 12. Domain Event와 snapshot 발행
 
-Renderer callback, PixiJS child 순서와 filter 결과는 이 순서에 개입하지 않는다.
+Renderer callback, Three.js object 순서와 post-process 결과는 이 순서에 개입하지 않는다.
 
 ## 10. 점수
 

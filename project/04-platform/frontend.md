@@ -5,26 +5,26 @@
 ## 1. 기술 기준선
 
 - Vite
-- React + TypeScript strict mode
-- PixiJS WebGL
-- Zustand: phase/HUD/settings처럼 저주파 projection
+- Pure JavaScript ES2022 module + TypeScript `checkJs`
+- Three.js `WebGLRenderer`, `EffectComposer`, `UnrealBloomPass`
+- Vite + `vite-plugin-singlefile`: 단일 HTML production bundle
 - Vitest: 순수 domain/simulation 단위·결정성 검사
 - Capacitor: iOS·Android 패키징
 
 ## 2. 역할 분리
 
-### React
+### Application Shell
 
 - 앱 boot와 Canvas host
-- Error Boundary
+- 오류 경계
 - 접근성 live region과 focus proxy
 - 개발 diagnostics
 - Application service 조립
 
-### PixiJS
+### Three.js
 
-- scene graph와 Canvas draw
-- shader, render texture, particle, text atlas
+- scene graph, 직교 camera와 Canvas draw
+- GLSL ShaderMaterial, post-processing, BufferGeometry와 Points
 - pointer hit target를 직접 판정해야 하는 Canvas UI
 
 ### Simulation
@@ -33,18 +33,15 @@
 - collision, absorption, spawn와 NPC 판단
 - fixed tick, seed와 score
 
-### Zustand
+### DOM projection
 
-- Run phase
-- 10Hz 이하 HUD snapshot
-- settings와 diagnostic visibility
+- 10Hz 이하 HUD snapshot과 접근성 live region만 반영한다.
+- DOM을 Simulation database처럼 사용하지 않는다.
 
-Zustand를 Simulation database처럼 사용하지 않는다.
+## 3. JavaScript와 정적 검사
 
-## 3. TypeScript
-
-- `strict`, `noUnusedLocals`, `noUnusedParameters`를 유지한다.
-- `any`, non-null assertion 남용과 무제한 index signature를 금지한다.
+- ES2022 module과 `// @ts-check`를 사용하고 `checkJs`, `strict`, `noUnusedLocals`를 유지한다.
+- JSDoc으로 public boundary와 구조체를 명시한다.
 - 단위가 다른 숫자는 이름 또는 branded type으로 구분한다: `WorldX`, `CssPixel`, `Milliseconds`, `Tick`.
 - public system 함수는 입력·출력·mutation을 type으로 드러낸다.
 - domain enum 대신 판별 가능한 union을 우선한다.
@@ -66,15 +63,15 @@ renderer.render(simulation.snapshot(accumulator / stepMs))
 
 - `maxCatchUpSteps`를 넘은 누적 시간은 폐기하고 diagnostic event를 남긴다.
 - pause/resume에서 accumulator를 초기화한다.
-- ticker callback 안에서 React setState를 호출하지 않는다.
+- render callback 안에서 고빈도 DOM update를 호출하지 않는다.
 
 ## 5. Entity와 view 수명
 
 - Simulation Entity가 생성되면 view factory가 ID에 맞는 view를 얻는다.
 - 소비된 Entity는 frame 끝에 view pool로 반환한다.
-- texture, filter, geometry를 Entity마다 새로 만들지 않고 공유한다.
-- scene 종료 시 ticker, DOM listener, audio voice와 GPU resource를 모두 해제한다.
-- React StrictMode의 mount→unmount→mount에서도 Canvas와 listener가 중복되지 않아야 한다.
+- texture, material, geometry를 Entity마다 새로 만들지 않고 공유한다.
+- scene 종료 시 animation loop, DOM listener, audio voice와 GPU resource를 모두 해제한다.
+- restart와 scene 재생성에서도 Canvas와 listener가 중복되지 않아야 한다.
 
 ## 6. 상태 갱신
 
@@ -85,7 +82,7 @@ renderer.render(simulation.snapshot(accumulator / stepMs))
 
 ## 7. 자산
 
-- 모든 runtime 자산은 import 또는 로컬 `/assets/` 경로로 번들에 포함한다.
+- 모든 runtime 자산은 import 또는 로컬 `/assets/` 경로로 가져오고 단일 HTML에 inline한다.
 - CSS `@import` 원격 font, CDN script, 원격 shader와 audio stream을 금지한다.
 - 자산은 안정 `assetId`로 Registry에서 해석한다. component가 경로 문자열을 조립하지 않는다.
 - preload 필수/지연 가능/scene 전용 자산을 manifest에서 구분한다.
@@ -117,7 +114,7 @@ production UI에 stack과 기기 식별 정보를 노출하지 않는다. 개발
 - full-screen offscreen pass 수는 tier별로 제한
 - 충돌 broadphase는 일정 Entity 수 이상 spatial hash 사용
 - hot loop에서 배열 spread, 객체 대량 생성과 string key 조합을 피한다.
-- 프로파일 없이 micro-optimization하지 않되 O(n²) 구조와 GPU filter 폭증은 설계 단계에서 차단한다.
+- 프로파일 없이 micro-optimization하지 않되 O(n²) 구조와 full-screen pass 폭증은 설계 단계에서 차단한다.
 
 ## 11. Native adapter
 

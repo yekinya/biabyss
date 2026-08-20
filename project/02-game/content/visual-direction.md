@@ -24,7 +24,7 @@
 
 뒤에서 앞으로:
 
-1. 외부 aura: 저해상도 blur 또는 bloom mask
+1. 외부 aura: `UnrealBloomPass`가 공유하는 emissive mask
 2. membrane shadow: 반투명 어두운 외곽
 3. membrane rim: 얇은 Fresnel 유사 하이라이트
 4. cytoplasm: domain-warped noise와 완만한 gradient
@@ -33,8 +33,11 @@
 7. specular arc: 화면 광원 방향을 공유하는 짧은 highlight
 8. gameplay cue: 보호, 위험, 흡수 event ring
 
-각 Cell에 고비용 blur filter를 독립 적용하는 방식은 prototype까지만 허용한다. 개체 수가 늘면 공유 RenderTexture,
-batched shader 또는 screen-space bloom으로 전환한다.
+Cell은 공유 PlaneGeometry와 종류별 공유 ShaderMaterial을 사용한다. 개별 blur filter를 붙이지 않고 화면 전체
+`EffectComposer` bloom으로 발광을 합성한다.
+
+형태는 원형 cocci, 타원형 yeast-like, 간균 bacillus, 쌍구균 diplococcus, 휘어진 vibrio, 불규칙 amoeboid의
+6종 SDF를 기준으로 한다. 실제 종을 재현한다고 주장하지 않고 현미경 관찰 질감에서 형태 언어만 가져온다.
 
 ## 4. 유기적 움직임
 
@@ -44,12 +47,13 @@ batched shader 또는 screen-space bloom으로 전환한다.
 - heartbeat: gameplay 판정과 무관한 작은 scale 변화
 - 흡수: 대상 방향으로 막이 당겨졌다가 질량 증가와 함께 복원
 - 사망: 즉시 사라지지 않고 외곽 붕괴 → 빛 소실 → 입자 분산 순서, 전체 600ms 이하
+- 이동 trail: 진행 반대쪽에서 점액성 point가 방출되고 수명 동안 크기와 alpha가 함께 감소
 
 ## 5. 배경
 
 - 단색 clear 위에 저채도 radial field를 사용한다.
 - 작은 먼지 particle은 parallax가 느껴질 정도로만 움직인다.
-- 큰 안개는 full-screen shader 한 장으로 처리한다.
+- 큰 안개는 번들된 현미경 bitmap과 full-screen domain-warp shader를 낮은 alpha로 합성한다.
 - 별자리, 행성, 우주선처럼 우주를 직접 암시하는 자산은 사용하지 않는다.
 
 ## 6. 후처리 예산
@@ -65,6 +69,6 @@ batched shader 또는 screen-space bloom으로 전환한다.
 
 ## 7. HUD
 
-최종 gameplay HUD도 Canvas scene에 두는 것이 원칙이다. 텍스트는 BitmapFont 또는 번들된 폰트 atlas를
-사용하고 숫자 변화가 layout을 흔들지 않게 고정 폭을 사용한다. 스크린 리더를 위한 최소 DOM live region은
-허용하지만 시각 HUD와 상호작용을 DOM에 중복 구현하지 않는다.
+Title과 10Hz 이하 저주파 HUD는 DOM projection을 허용한다. 숫자는 고정 폭 font와 너비를 사용해 layout을
+흔들지 않는다. 세포, particle, trail, world marker처럼 gameplay 공간에 속한 시각과 상호작용은 DOM에
+중복 구현하지 않는다.

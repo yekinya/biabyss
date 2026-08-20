@@ -2,8 +2,8 @@
 
 ## 1. 결정 요약
 
-- 단일 저장소의 Vite + React + TypeScript 웹 애플리케이션
-- 단일 PixiJS WebGL Canvas gameplay surface
+- 단일 저장소의 Vite + Pure JavaScript ES module 웹 애플리케이션
+- 단일 Three.js WebGL Canvas gameplay surface와 single-file production bundle
 - 고정 timestep의 로컬 Simulation
 - 앱 셸은 Capacitor iOS·Android
 - 공개 웹 배포 없음
@@ -16,7 +16,7 @@ application
 ├── domain          # 순수 타입, RuleSet, 불변 조건
 ├── simulation      # systems, fixed loop, PRNG, spatial index
 ├── presentation
-│   ├── rendering   # PixiJS, shader, particles, camera
+│   ├── rendering   # Three.js, GLSL, Points, post-processing, camera
 │   ├── audio       # Web Audio mixer
 │   └── hud         # Canvas HUD와 접근성 projection
 ├── platform
@@ -24,7 +24,7 @@ application
 │   ├── lifecycle   # visibility/Capacitor App state
 │   ├── storage     # local settings/result
 │   └── haptics     # optional native adapter
-└── shell           # React bootstrap와 Error Boundary
+└── shell           # DOM bootstrap와 error boundary
 ```
 
 의존 방향:
@@ -35,7 +35,7 @@ shell → application → simulation → domain
                     ↘ platform adapters
 ```
 
-`domain`과 `simulation`은 React, PixiJS, Capacitor를 import하지 않는다. Presentation은 Simulation을 변경하지
+`domain`과 `simulation`은 Three.js, DOM, Capacitor를 import하지 않는다. Presentation은 Simulation을 변경하지
 않고 command/application boundary를 통해서만 행동을 요청한다.
 
 ## 3. 목표 소스 구조
@@ -78,10 +78,10 @@ pointer/touch
   → FixedStepLoop
   → Simulation systems
   → Snapshot + Domain Events
-  → Pixi Renderer / Audio / HUD projection
+  → Three Renderer / Audio / HUD projection
 ```
 
-render ticker의 delta를 곧바로 게임 판정 dt로 사용하지 않는다. accumulator는 최대 catch-up tick을 제한하고
+render callback의 delta를 곧바로 게임 판정 dt로 사용하지 않는다. accumulator는 최대 catch-up tick을 제한하고
 초과 시간은 폐기한다.
 
 ## 5. 네이티브 패키징

@@ -6,6 +6,7 @@
 biabyss-apps/apps/mobile/src/game/rendering/shaders/     # GLSL/WGSL과 uniform type
 biabyss-apps/apps/mobile/src/game/rendering/materials/   # palette, shader 조합, fallback
 biabyss-apps/apps/mobile/src/game/rendering/particles/   # particle emitter 설정
+biabyss-apps/apps/mobile/src/assets/images/              # single-file bundle에 inline할 image
 biabyss-apps/apps/mobile/public/assets/audio/            # 앱 번들 음향
 biabyss-apps/apps/mobile/public/assets/fonts/            # 번들 폰트와 license
 biabyss-apps/apps/mobile/public/assets/images/           # icon/splash 등 필요한 정적 이미지

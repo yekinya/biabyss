@@ -2,7 +2,7 @@
 
 ## 1. 소유권 원칙
 
-Simulation state는 엔진 인스턴스 하나가 단독 소유한다. React, Zustand, PixiJS DisplayObject, Audio adapter가
+Simulation state는 엔진 인스턴스 하나가 단독 소유한다. DOM, Three.js Object3D, Audio adapter가
 같은 mutable 객체를 공동 소유하지 않는다.
 
 ```text
@@ -37,6 +37,7 @@ RunSession은 시작·pause·resume·게임오버·종료 전이를 소유한다
 interface WorldState {
   readonly width: number
   readonly height: number
+  readonly viewportAreaMultiplier: number
   readonly playerId: EntityId
   cells: Map<EntityId, CellState>
   nutrients: Map<EntityId, NutrientState>
@@ -111,7 +112,7 @@ Value Object는 생성 경계에서 유효성을 검사하고 Simulation 내부�
 
 ## 6. Presentation 모델
 
-PixiJS 객체는 `CellView`, `NutrientView`, `WorldView`처럼 별도 관리한다. `CellView`가 가진 scale·filter·particle은
+Three.js 객체는 `CellView`, `NutrientView`, `WorldView`처럼 별도 관리한다. `CellView`가 가진 scale·material·particle은
 Simulation field가 아니다. Entity ID로 view를 찾되 view 삭제가 Entity 삭제를 유발하지 않는다.
 
 HUD에는 매 frame 전체 World를 넘기지 않고 다음 저주파 snapshot만 전달한다.
@@ -137,7 +138,7 @@ interface HudSnapshot {
 저장하지 않음:
 
 - mutable World 전체
-- PixiJS 객체와 GPU resource
+- Three.js 객체와 GPU resource
 - 진행 중 NPC brain
 - 일시정지 시각을 이용한 오프라인 성장
 
