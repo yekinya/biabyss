@@ -27,6 +27,13 @@ npm install
 npm run dev:mobile
 ```
 
+저장소 root에서는 실행 스크립트를 사용할 수 있습니다.
+
+```bash
+./deploy/run-app.sh
+./deploy/run-app.sh --host 0.0.0.0 --port 4173
+```
+
 ## 명령어
 
 ```bash
