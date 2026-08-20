@@ -6,6 +6,7 @@ import {
   type Ticker,
 } from 'pixi.js'
 import { useGameStore } from '../../store/gameStore'
+import { radiusForMass } from '../../domain/rules/mass'
 
 interface Point {
   x: number
@@ -361,6 +362,6 @@ export class BiabyssGame {
   }
 
   private radiusFor(mass: number) {
-    return Math.sqrt(mass) * 4
+    return radiusForMass(mass)
   }
 }
