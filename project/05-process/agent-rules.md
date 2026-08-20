@@ -146,7 +146,7 @@ git pull --ff-only origin develop
 - mass/radius/absorption 불변 조건
 - Canvas 좌표와 DPR 변환
 - resize, background/resume, context loss
-- listener, ticker, GPU/audio resource 정리
+- listener, animation loop, GPU/audio resource 정리
 - low tier와 감소 모션 fallback
 - 외부 runtime 자산 요청 0
 - iOS/Android packaging 영향

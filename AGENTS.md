@@ -49,9 +49,9 @@ root이고 저장소 root에는 실행 앱의 `src`, `package.json`, Vite·TypeS
 
 ## 5. 절대 구현 계약
 
-1. 게임 플레이는 하나의 PixiJS Canvas가 그린다. React DOM은 앱 부트스트랩, 접근성 대체 정보와 개발용
-   진단 셸에 한정한다.
-2. React state와 Zustand에 매 프레임 위치·속도·파티클을 저장하지 않는다.
+1. 게임 플레이는 하나의 Three.js WebGL Canvas가 그린다. DOM은 앱 부트스트랩, Title, 10Hz 이하 HUD,
+   접근성 대체 정보와 개발용 진단 셸에 한정한다.
+2. DOM state에 매 프레임 위치·속도·파티클을 저장하지 않는다.
 3. 시뮬레이션은 고정 timestep을 사용하고 렌더링과 분리한다.
 4. 질량·이동·흡수·NPC 판정 수치는 중앙 RuleSet 한 곳에서 읽는다. 숫자를 화면이나 Entity에 흩뜨리지 않는다.
 5. 렌더러는 게임 결과를 결정하지 않는다. 시뮬레이션 상태를 읽어 표현만 한다.

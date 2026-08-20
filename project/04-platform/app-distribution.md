@@ -2,7 +2,7 @@
 
 ## 1. 선택
 
-모바일 iOS·Android의 1차 셸은 **Capacitor**를 사용한다. BIABYSS는 이미 Vite/PixiJS 웹 코드이며,
+모바일 iOS·Android의 1차 셸은 **Capacitor**를 사용한다. BIABYSS는 Vite/Three.js 웹 코드이며,
 Capacitor는 기존 web app의 `dist/`를 native project에 포함하고 필요한 native API만 plugin adapter로 열 수 있다.
 
 Tauri 2는 desktop까지 단일 체계로 확장할 때 재검토한다. 현재 모바일 앱만을 위해 Rust toolchain과 별도

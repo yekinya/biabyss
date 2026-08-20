@@ -48,7 +48,7 @@ project/
 | 작업 | 추가 문서 |
 |---|---|
 | 셰이더·파티클·세포 표현 | `visual-direction.md`, `canvas-hardrules.md` |
-| 입력·상태·React/PixiJS | `frontend.md`, `canvas-hardrules.md` |
+| 입력·상태·Three.js | `frontend.md`, `canvas-hardrules.md` |
 | 시작·플레이·게임오버 UX | `03-screen/` 전체 |
 | 성능·앱 생명주기 | `architecture.md`, `canvas-hardrules.md` |
 | iOS·Android 패키징·배포 | `app-distribution.md`, `test-strategy.md` |
@@ -69,7 +69,7 @@ project/
 | `information-architecture.md` | 화면 집합, 계층, 상태 표시 |
 | `flows.md` | 입력부터 게임오버·재시작까지 사용자 흐름 |
 | `architecture.md` | 논리 계층, 의존 방향, 런타임·배포 topology |
-| `frontend.md` | React·TypeScript·PixiJS 구현 가이드 |
+| `frontend.md` | Pure JavaScript·Three.js 구현 가이드 |
 | `canvas-hardrules.md` | Canvas 좌표·루프·렌더링·성능 절대 규칙 |
 | `app-distribution.md` | Capacitor, 서명, 스테이징과 스토어 승격 |
 | `agent-rules.md` | 분석·설계·구현·Git·PR·병합 절차 |

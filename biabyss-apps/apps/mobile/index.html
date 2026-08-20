@@ -11,8 +11,47 @@
     <title>BIABYSS</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <main id="app" class="app-shell">
+      <div id="game-surface" class="game-surface" aria-hidden="true"></div>
+      <div class="optics" aria-hidden="true"></div>
+
+      <header class="top-bar">
+        <div class="brand-block">
+          <span class="specimen-mark"><i></i></span>
+          <div>
+            <strong>BIABYSS</strong>
+            <small>LIVE SPECIMEN / 400×</small>
+          </div>
+        </div>
+
+        <div class="hud" aria-live="polite">
+          <div><span>MASS</span><strong id="mass-value">36.0</strong></div>
+          <div><span>ABSORBED</span><strong id="absorbed-value">0</strong></div>
+          <div><span>FIELD</span><strong id="field-value">36×</strong></div>
+        </div>
+      </header>
+
+      <aside class="field-map" aria-hidden="true">
+        <div class="field-map__label"><span>FIELD POSITION</span><b id="position-value">50 / 50</b></div>
+        <div class="field-map__track"><i id="field-cursor"></i></div>
+      </aside>
+
+      <section id="start-panel" class="start-panel">
+        <p class="eyebrow"><span></span> DARK-FIELD CULTURE 07</p>
+        <h1 id="panel-title">ENTER THE<br /><em>MICROBIAL DEEP</em></h1>
+        <p id="panel-copy">점액성 심연을 헤엄치며 더 작은 생명체를 흡수하세요.<br />빛이 짙을수록 더 거대한 포식자입니다.</p>
+        <button id="start-button" type="button"><span>표본에 접속</span><i>→</i></button>
+        <small>POINTER / TOUCH TO STEER · SPACE TO PAUSE</small>
+      </section>
+
+      <footer class="footer-bar">
+        <div><span id="status-light" class="status-light"></span><b id="status-copy">SPECIMEN STABLE</b></div>
+        <div class="scale"><i></i><span>50 μm</span></div>
+      </footer>
+
+      <p id="live-region" class="sr-only" aria-live="assertive"></p>
+      <output id="diagnostics" hidden></output>
+    </main>
+    <script type="module" src="/src/main.js"></script>
   </body>
 </html>
-

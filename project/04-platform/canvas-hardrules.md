@@ -2,9 +2,9 @@
 
 ## 1. 단일 Surface
 
-- gameplay 시각과 조작 UI는 PixiJS Canvas 한 장에 그린다.
+- gameplay 시각은 Three.js WebGL Canvas 한 장에 그린다.
 - DOM Cell, DOM particle, CSS로 움직이는 gameplay object를 만들지 않는다.
-- DOM은 host, 접근성 projection과 개발 diagnostics만 담당한다.
+- DOM은 host, Title, 10Hz 이하 HUD, 접근성 projection과 개발 diagnostics만 담당한다.
 - Canvas를 feature별로 여러 장 겹치지 않는다. offscreen canvas/render texture는 renderer 내부 구현이다.
 
 ## 2. 좌표계
@@ -33,7 +33,7 @@ client coordinate
 
 ## 4. 렌더링
 
-- Cell geometry를 매 frame `Graphics.clear()`로 재작성하지 않는다.
+- Cell geometry를 매 frame 재작성하지 않는다. 형태 변화는 shader uniform으로 계산한다.
 - 반복 형태는 공유 geometry/context/texture를 사용한다.
 - shader program과 uniform layout은 material별로 공유한다.
 - 개체마다 별도 blur/bloom filter를 붙이지 않는다. prototype 예외는 SPEC에 제거 조건을 둔다.
@@ -70,7 +70,7 @@ client coordinate
 - resize observer 또는 renderer resize 경계는 한 곳만 둔다.
 - 0×0, 극단 aspect ratio와 DPR 변경을 처리한다.
 - resize 도중 Simulation을 pause하고 world mapping을 원자적으로 교체한다.
-- RenderTexture와 filter area를 새 viewport에 맞게 재생성한다.
+- composer render target과 camera projection을 새 viewport에 맞게 재생성한다.
 - orientation lock은 제품 정책으로 결정하며 코드가 무단으로 강제하지 않는다.
 
 ## 9. WebGL context
@@ -102,10 +102,10 @@ client coordinate
 ## 12. 금지 패턴
 
 - `Math.random()`을 Simulation에서 직접 호출
-- ticker 안의 React/Zustand 고빈도 set
+- animation loop 안의 고빈도 DOM state 갱신
 - CSS 좌표를 collision에 사용
 - DisplayObject bounds를 권위 hitbox로 사용
 - 색 또는 image 존재 여부로 threat/prey 판정
 - 렌더 순회 중 Simulation collection 직접 삭제
-- listener/ticker/filter/texture destroy 누락
+- listener/animation loop/material/geometry/texture destroy 누락
 - 외부 URL font, image, audio 또는 shader
