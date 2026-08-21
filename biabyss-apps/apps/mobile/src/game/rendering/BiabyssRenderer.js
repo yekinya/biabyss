@@ -5,7 +5,6 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
-import microscopeFieldUrl from '../../assets/images/microscope-field-v1.png?url'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { CellRenderer } from './CellRenderer.js'
 import { JoystickRenderer } from './JoystickRenderer.js'
@@ -58,16 +57,12 @@ export class BiabyssRenderer {
       knobY: 0,
       strength: 0,
     }
-    this.texture = new THREE.TextureLoader().load(microscopeFieldUrl)
-    this.texture.colorSpace = THREE.SRGBColorSpace
-    this.texture.wrapS = THREE.RepeatWrapping
-    this.texture.wrapT = THREE.RepeatWrapping
-    this.texture.minFilter = THREE.LinearMipmapLinearFilter
-
     this.fieldMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        uTexture: { value: this.texture },
         uTime: { value: 0 },
+        uMotionScale: { value: this.reducedMotion ? 0.18 : 1 },
+        uSeed: { value: simulation.seed % 997 },
+        uWorldSize: { value: new THREE.Vector2(simulation.worldWidth, simulation.worldHeight) },
       },
       vertexShader: fieldVertexShader,
       fragmentShader: fieldFragmentShader,
@@ -80,7 +75,7 @@ export class BiabyssRenderer {
     this.fieldBoundary = this.createFieldBoundary()
     this.scene.add(this.fieldBoundary)
 
-    this.cellRenderer = new CellRenderer(this.scene)
+    this.cellRenderer = new CellRenderer(this.scene, this.reducedMotion)
     this.ambientParticles = new AmbientParticles(
       this.scene,
       simulation.worldWidth,
@@ -164,6 +159,7 @@ export class BiabyssRenderer {
     if (this.contextLost) return
     this.frame += 1
     this.fieldMaterial.uniforms.uTime.value = time
+    this.fieldMaterial.uniforms.uSeed.value = this.simulation.seed % 997
     this.cellRenderer.update(this.simulation, time, alpha)
     this.nutrientParticles.update(this.simulation, time)
     this.internalParticles.update(this.simulation, time, alpha)
@@ -230,6 +226,8 @@ export class BiabyssRenderer {
       engine: 'three-webgl',
       canvasCount: this.host.querySelectorAll('canvas').length,
       postProcessing: ['RenderPass', 'UnrealBloomPass', 'OutputPass'],
+      environment: 'procedural-cosmic-fluid',
+      environmentTextures: 0,
       worldWidth: this.simulation.worldWidth,
       worldHeight: this.simulation.worldHeight,
       viewportWidth: this.viewportWidth,
@@ -268,7 +266,6 @@ export class BiabyssRenderer {
     this.joystick.dispose()
     this.fieldGeometry.dispose()
     this.fieldMaterial.dispose()
-    this.texture.dispose()
     this.fieldBoundary.geometry.dispose()
     this.fieldBoundary.material.dispose()
     this.composer.dispose()

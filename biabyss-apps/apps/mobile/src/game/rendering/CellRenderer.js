@@ -6,9 +6,10 @@ import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { cellFragmentShader, cellVertexShader } from './shaders/cellShader.js'
 
 export class CellRenderer {
-  /** @param {THREE.Scene} scene */
-  constructor(scene) {
+  /** @param {THREE.Scene} scene @param {boolean} reducedMotion */
+  constructor(scene, reducedMotion) {
     this.scene = scene
+    this.reducedMotion = reducedMotion
     this.geometry = new THREE.PlaneGeometry(2, 2, 1, 1)
     /** @type {Map<string, THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>>} */
     this.meshes = new Map()
@@ -36,7 +37,8 @@ export class CellRenderer {
       const stride = 0.5 + Math.sin(gaitAngle) * 0.5
       const rearFollow = 0.5 + Math.sin(gaitAngle - 1.18) * 0.5
       const stretch = 1 + locomotion * (0.06 + stride * 0.16)
-      const pulse = 1 + Math.sin(time * 1.7 + cell.phase) * 0.022
+      const pulseAmplitude = this.reducedMotion ? 0.006 : 0.022
+      const pulse = 1 + Math.sin(time * 1.7 + cell.phase) * pulseAmplitude
       const planeRadius = radius / 0.72
       mesh.position.set(x, y, 3)
       mesh.scale.set(planeRadius * stretch * pulse, planeRadius / Math.sqrt(stretch) / pulse, 1)

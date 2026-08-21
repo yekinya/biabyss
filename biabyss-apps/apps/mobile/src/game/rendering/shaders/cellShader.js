@@ -96,16 +96,27 @@ export const cellFragmentShader = /* glsl */ `
     float nucleoid = (1.0 - smoothstep(0.018, 0.075, nucleoidLine)) *
       (1.0 - smoothstep(0.15, 0.58, abs(organelleP.x))) * inner;
 
-    float gather = 0.84 + sin(t * 1.18 + uPhase) * 0.1;
+    float coreSpread = mix(0.10, 0.31, uLocomotion * (0.34 + uStride * 0.66));
+    float coreBreathA = 0.92 + sin(t * 3.8 + uPhase) * 0.08;
+    float coreBreathB = 0.92 + sin(t * 4.3 + uPhase + 2.1) * 0.08;
+    float coreA = (1.0 - smoothstep(0.055, 0.145, length(organelleP - vec2(coreSpread, 0.018)))) *
+      coreBreathA;
+    float coreB = (1.0 - smoothstep(0.052, 0.135, length(organelleP + vec2(coreSpread, 0.018)))) *
+      coreBreathB;
+    float luminousCores = (coreA + coreB) * inner;
+
+    float internalRate = 1.0 + uLocomotion * 2.25;
+    float gather = 0.84 + sin(t * 1.18 * internalRate + uPhase) * 0.1;
     vec2 galaxyP = organelleP / gather;
     float galaxyRadius = length(galaxyP);
     float galaxyAngle = atan(galaxyP.y, galaxyP.x);
-    galaxyAngle += galaxyRadius * 2.6 - t * 0.34;
+    galaxyAngle += galaxyRadius * 2.6 - t * (0.34 + uLocomotion * 0.72);
     galaxyP = mat2(cos(galaxyAngle), -sin(galaxyAngle), sin(galaxyAngle), cos(galaxyAngle)) * galaxyP;
     vec2 granuleGrid = floor((galaxyP + 0.8) * 9.0);
     vec2 granuleCell = fract((galaxyP + 0.8) * 9.0) - 0.5;
     float granuleSeed = hash21(granuleGrid + floor(uPhase * 11.0));
-    float twinkle = 0.28 + 0.72 * (0.5 + 0.5 * sin(t * 6.4 + granuleSeed * 18.0));
+    float twinkle = 0.28 +
+      0.72 * (0.5 + 0.5 * sin(t * 6.4 * (1.0 + uLocomotion) + granuleSeed * 18.0));
     float granules = (1.0 - smoothstep(0.09, 0.23, length(granuleCell))) *
       step(0.68, granuleSeed) * inner * twinkle;
 
@@ -114,7 +125,8 @@ export const cellFragmentShader = /* glsl */ `
     vec3 deepColor = mix(uColor * 0.055, uColor * 0.34, caustic);
     vec3 color = deepColor * body;
     color += uColor * rim * (0.56 + uThreat * 0.26);
-    color += mix(uColor, vec3(0.88, 1.0, 1.0), 0.68) * nucleoid * 1.48;
+    color += mix(uColor, vec3(0.88, 1.0, 1.0), 0.68) * nucleoid * 0.72;
+    color += mix(uColor, vec3(0.94, 1.0, 1.0), 0.82) * luminousCores * 1.72;
     color += vec3(0.84, 1.0, 0.97) * granules * 1.85;
     color += vec3(0.84, 1.0, 1.0) * specular * body * 0.48;
     color += uColor * (1.0 - smoothstep(0.0, 0.82, length(softP))) * 0.18;

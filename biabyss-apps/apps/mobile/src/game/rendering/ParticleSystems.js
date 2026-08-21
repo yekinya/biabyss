@@ -137,17 +137,30 @@ export class InternalParticles {
       const y = THREE.MathUtils.lerp(cell.previousY, cell.y, alpha)
       const radius = Math.sqrt(cell.mass) * RULE_SET.mass.radiusScale
       const speed = Math.hypot(cell.vx, cell.vy)
+      const speedReference = cell.kind === 'player' ? RULE_SET.player.maxSpeed : RULE_SET.npc.maxSpeed
+      const locomotion = Math.min(1, speed / speedReference)
+      const flowRate = 1 + locomotion * 2.2
       const inertiaScale = Math.min(radius * 0.18, speed * 0.045)
       const inertiaX = speed > 0 ? (-cell.vx / speed) * inertiaScale : 0
       const inertiaY = speed > 0 ? (-cell.vy / speed) * inertiaScale : 0
       this.color.setHSL(cell.kind === 'player' ? 0.49 : cell.hue, 0.78, 0.72)
       for (let localIndex = 0; localIndex < this.perCell; localIndex += 1) {
         const spread =
-          0.68 + 0.3 * (0.5 + Math.sin(time * (0.72 + localIndex * 0.031) + cell.phase + localIndex) * 0.5)
+          0.68 +
+          0.3 *
+            (0.5 +
+              Math.sin(time * (0.72 + localIndex * 0.031) * flowRate + cell.phase + localIndex) *
+                0.5)
         const angle =
-          time * (0.28 + localIndex * 0.028) + cell.phase + localIndex * 2.17 + spread * 0.75
+          time * (0.28 + localIndex * 0.028) * flowRate +
+          cell.phase +
+          localIndex * 2.17 +
+          spread * 0.75
         const orbit = radius * (0.1 + (localIndex % 4) * 0.085) * spread
-        const twinkle = 0.5 + Math.sin(time * (2.7 + localIndex * 0.17) + cell.phase * 2 + localIndex) * 0.5
+        const twinkle =
+          0.5 +
+          Math.sin(time * (2.7 + localIndex * 0.17) * (1 + locomotion) + cell.phase * 2 + localIndex) *
+            0.5
         this.buffer.set(
           particleIndex,
           x + inertiaX + Math.cos(angle) * orbit,

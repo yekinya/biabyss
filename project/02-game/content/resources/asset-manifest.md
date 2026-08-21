@@ -4,7 +4,8 @@
 
 | assetId | kind | 예정 위치 | 상태 | fallback | 연결 SPEC |
 |---|---|---|---|---|---|
-| `shader.world.fog.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | TECH_QA | bitmap + 단색 radial gradient | SPEC-BIABYSS-20260820-three-microscope-world |
+| `shader.world.fog.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | REJECTED | 단색 radial gradient | SPEC-BIABYSS-20260820-three-microscope-world |
+| `shader.world.cosmic-fluid.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | DRAFT | 저채도 2-layer noise | SPEC-BIABYSS-20260820-soft-cell-locomotion |
 | `shader.cell.membrane.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | TECH_QA | `MeshBasicMaterial` 원형 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.cell.cytoplasm.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | TECH_QA | 반투명 gradient | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.cell.soft-locomotion.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 속도 기반 단순 타원 scale | SPEC-BIABYSS-20260820-soft-cell-locomotion |
@@ -14,7 +15,7 @@
 | `material.cell.player.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | cyan 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
 | `material.cell.prey.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | green 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
 | `material.cell.threat.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | magenta 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
-| `image.field.microscope.v1` | image | `biabyss-apps/apps/mobile/src/assets/images/microscope-field-v1.png` | TECH_QA | shader noise 배경 | SPEC-BIABYSS-20260820-three-microscope-world |
+| `image.field.microscope.v1` | image | `biabyss-apps/apps/mobile/src/assets/images/microscope-field-v1.png` | REJECTED | procedural shader 배경 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `font.ui.mono.v1` | font | `biabyss-apps/apps/mobile/public/assets/fonts/` | PLANNED | system monospace | ui-baseline |
 | `audio.ambience.deep.v1` | audio | `biabyss-apps/apps/mobile/public/assets/audio/` | PLANNED | silence | audio-baseline |
 | `audio.nutrient.absorb.v1` | audio | `biabyss-apps/apps/mobile/public/assets/audio/` | PLANNED | silence | audio-baseline |
@@ -32,3 +33,5 @@
 - prompt: dark-field microscopy의 어두운 수중 배지, 점액 섬유, 미세 부유물과 cyan/violet 광학 흔적. 큰 세포,
   생명체, 텍스트, 워터마크, 우주 이미지는 제외하고 camera 이동용 균일 밀도 texture로 생성.
 - 권리/상태: 프로젝트 전용 생성 자산, checksum·single-file inline·브라우저 표시 검증으로 `TECH_QA`
+- 교체: `SPEC-BIABYSS-20260820-soft-cell-locomotion`에서 고정 반복 무늬 제거 요구에 따라 runtime 사용을
+  중단했다. 파일은 과거 생성 기록 보존을 위해 저장소에 남지만 production bundle에는 포함하지 않는다.
