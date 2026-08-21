@@ -77,7 +77,7 @@ interface NpcArchetype {
 
 | 값 | 기준 |
 |---|---:|
-| `id` | `microscope-ecology-v2` |
+| `id` | `microscope-ecology-v3` |
 | `simulationHz` | 60 |
 | `player.initialMass` | 36 |
 | `player.startProtectionMs` | 6000 |
@@ -100,13 +100,13 @@ interface NpcArchetype {
 | `mass.cellEfficiency` | 0.28 |
 | `mass.absorptionDurationSeconds` | 0.72 |
 | `mass.absorptionPullPerSecond` | 11 |
-| `world.populationMultiplier` | 8 |
-| `npc.count` | 432 |
+| `world.populationMultiplier` | 10 |
+| `npc.count` | 540 |
 | `npc.reachBrakePerSecond` | 15 |
 | `npc.driveBrakePerSecond` | 1.8 |
 | `npc.catchBrakePerSecond` | 18 |
 | `npc.restBrakePerSecond` | 22 |
-| `nutrient.targetCount` | 2560 |
+| `nutrient.targetCount` | 3200 |
 | `nutrient.mass` | 1 |
 
 종별 이동 수치:
@@ -254,7 +254,7 @@ NPC의 어그로 프로필은 Species RuleSet에서 고정한다. 감지 거리�
 ## 8. Spawn 규칙
 
 - Field를 동일 크기의 cell로 나눈 stratified grid에 NPC와 Nutrient를 배치하고 각 cell 안에서 seed jitter를 준다.
-- NPC 432개와 Mass 1 Nutrient 2560개를 Field 전역에 stratified 배치한다.
+- NPC 540개와 Mass 1 Nutrient 3200개를 Field 전역에 stratified 배치한다.
 - Player 시작 위치에서 `safeSpawnDistance` 이상 떨어진 곳에 NPC를 만든다.
 - 새 NPC는 Player의 시작 보호 시간 동안 Player를 흡수할 수 없다.
 - spawn 후보가 기존 큰 Cell과 겹치면 제한 횟수만큼 다시 찾는다.
