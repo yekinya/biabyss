@@ -1,6 +1,7 @@
 // @ts-check
 
 import { canAbsorb, radiusForMass } from '../domain/rules/mass.js'
+import { aggroIntent } from '../domain/rules/npcBehavior.js'
 import { advanceGait, sampleGait } from '../domain/rules/gait.js'
 import { RULE_SET } from '../domain/rules/ruleSet.js'
 import { SeededRandom, stratifiedPositions } from './random.js'
@@ -18,6 +19,7 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  * @property {number} vx
  * @property {number} vy
  * @property {number} mass
+ * @property {'player' | 'micrococcus' | 'ciliophoran' | 'larvoid' | 'tentacle-amoeba' | 'diplococcus'} speciesId
  * @property {number} phase
  * @property {number} heading
  * @property {number} morph
@@ -25,6 +27,19 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  * @property {number} previousGaitPhase
  * @property {number} gaitPhase
  * @property {number} gaitCycle
+ * @property {string | undefined} absorbedBy
+ * @property {number} previousAbsorptionProgress
+ * @property {number} absorptionProgress
+ */
+
+/**
+ * @typedef {object} AbsorptionState
+ * @property {string} predatorId
+ * @property {string} preyId
+ * @property {number} elapsedSeconds
+ * @property {number} durationSeconds
+ * @property {number} startPreyMass
+ * @property {number} transferredMass
  */
 
 /**
@@ -58,6 +73,18 @@ function brakeForSegment(config, segment) {
   return config.restBrakePerSecond
 }
 
+/** @param {number} current @param {number} target @param {number} maximumDelta */
+function turnToward(current, target, maximumDelta) {
+  const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current))
+  return current + Math.max(-maximumDelta, Math.min(maximumDelta, delta))
+}
+
+/** @param {number} value */
+function smoothstep(value) {
+  const clamped = Math.max(0, Math.min(1, value))
+  return clamped * clamped * (3 - 2 * clamped)
+}
+
 export class Simulation {
   /** @param {number} viewportWidth @param {number} viewportHeight @param {number} [seed] */
   constructor(viewportWidth, viewportHeight, seed = 0x0b1a7b55) {
@@ -81,6 +108,8 @@ export class Simulation {
     this.cells = []
     /** @type {NutrientState[]} */
     this.nutrients = []
+    /** @type {AbsorptionState[]} */
+    this.activeAbsorptions = []
     /** @type {CellState} */
     this.player = this.createPlayer()
     this.buildField()
@@ -100,13 +129,17 @@ export class Simulation {
       vx: 0,
       vy: 0,
       mass: RULE_SET.player.initialMass,
+      speciesId: 'player',
       phase: this.random.between(0, TAU),
       heading: 0,
-      morph: 1,
+      morph: 5,
       hue: 0.49,
       previousGaitPhase: 0,
       gaitPhase: 0,
       gaitCycle: 0,
+      absorbedBy: undefined,
+      previousAbsorptionProgress: 0,
+      absorptionProgress: 0,
     }
   }
 
@@ -134,7 +167,7 @@ export class Simulation {
       id: `nutrient-${index}`,
       x: position.x,
       y: position.y,
-      mass: this.random.between(RULE_SET.nutrient.massMin, RULE_SET.nutrient.massMax),
+      mass: RULE_SET.nutrient.mass,
       phase: this.random.between(0, TAU),
       hue: index % 4 === 0 ? 0.74 : this.random.between(0.45, 0.57),
     }))
@@ -164,6 +197,7 @@ export class Simulation {
 
   /** @param {number} index @param {number} x @param {number} y @returns {CellState} */
   createNpc(index, x, y) {
+    const archetype = RULE_SET.npc.archetypes[index % RULE_SET.npc.archetypes.length]
     const heading = this.random.between(0, TAU)
     const gaitPhase = this.random.between(0, 1)
     return {
@@ -175,14 +209,18 @@ export class Simulation {
       previousY: y,
       vx: 0,
       vy: 0,
-      mass: this.random.between(RULE_SET.npc.massMin, RULE_SET.npc.massMax),
+      mass: this.random.between(archetype.massMin, archetype.massMax),
+      speciesId: archetype.id,
       phase: this.random.between(0, TAU),
       heading,
-      morph: index % 6,
-      hue: [0.48, 0.37, 0.78, 0.91, 0.12, 0.56][index % 6],
+      morph: archetype.morph,
+      hue: [0.31, 0.18, 0.13, 0.06, 0.23][index % RULE_SET.npc.archetypes.length],
       previousGaitPhase: gaitPhase,
       gaitPhase,
       gaitCycle: index,
+      absorbedBy: undefined,
+      previousAbsorptionProgress: 0,
+      absorptionProgress: 0,
     }
   }
 
@@ -204,6 +242,7 @@ export class Simulation {
     this.score = 0
     this.invulnerableUntil = RULE_SET.player.startProtectionMs / 1000
     this.events.length = 0
+    this.activeAbsorptions.length = 0
     this.player = this.createPlayer()
     this.input = { x: this.player.x, y: this.player.y, strength: 0, active: false }
     this.buildField()
@@ -233,13 +272,19 @@ export class Simulation {
 
     this.tick += 1
     this.elapsed += dtSeconds
-    this.events.length = 0
     this.rememberPositions()
     this.movePlayer(dtSeconds)
     this.moveNpcs(dtSeconds)
+    if (this.updateAbsorptions(dtSeconds)) return
     this.consumeNutrients()
     this.resolveCellContacts()
     this.score = Math.floor((this.player.mass - RULE_SET.player.initialMass) * 10 + this.elapsed * 2)
+  }
+
+  takeEvents() {
+    const events = this.events
+    this.events = []
+    return events
   }
 
   rememberPositions() {
@@ -247,12 +292,14 @@ export class Simulation {
       cell.previousX = cell.x
       cell.previousY = cell.y
       cell.previousGaitPhase = cell.gaitPhase
+      cell.previousAbsorptionProgress = cell.absorptionProgress
     }
   }
 
   /** @param {number} dt */
   movePlayer(dt) {
     const player = this.player
+    if (player.absorbedBy) return
     const dx = this.input.x - player.x
     const dy = this.input.y - player.y
     const distance = Math.hypot(dx, dy)
@@ -306,53 +353,68 @@ export class Simulation {
   moveNpcs(dt) {
     for (let index = 1; index < this.cells.length; index += 1) {
       const npc = this.cells[index]
+      if (npc.absorbedBy) continue
+      const archetype = this.archetypeFor(npc)
       const dx = this.player.x - npc.x
       const dy = this.player.y - npc.y
       const distance = Math.max(1, Math.hypot(dx, dy))
-      const aware = distance < RULE_SET.npc.awarenessRadius
-      const flees = canAbsorb(this.player.mass, npc.mass)
-      const pursues = canAbsorb(npc.mass, this.player.mass)
-      const protectedFromThreat = this.elapsed < this.invulnerableUntil && pursues
-      const intent = aware ? (flees || protectedFromThreat ? -1 : pursues ? 1 : 0) : 0
+      const aggroDirection = aggroIntent(archetype, distance)
 
-      npc.heading += Math.sin(this.elapsed * 0.68 + npc.phase) * dt * 0.38
-      const wanderX = Math.cos(npc.heading)
-      const wanderY = Math.sin(npc.heading)
-      const targetX = dx / distance
-      const targetY = dy / distance
-      let directionX = wanderX + targetX * intent * 1.35
-      let directionY = wanderY + targetY * intent * 1.35
-      const directionLength = Math.max(0.001, Math.hypot(directionX, directionY))
-      directionX /= directionLength
-      directionY /= directionLength
-      npc.heading = Math.atan2(directionY, directionX)
-      this.advanceCellGait(
-        npc,
-        dt,
-        RULE_SET.npc.gaitFrequency * (0.88 + (index % 5) * 0.035),
-      )
+      if (aggroDirection !== 0) {
+        const targetHeading = Math.atan2(dy * aggroDirection, dx * aggroDirection)
+        npc.heading = turnToward(npc.heading, targetHeading, archetype.turnRate * dt)
+      } else {
+        npc.heading +=
+          Math.sin(this.elapsed * (0.34 + (index % 7) * 0.025) + npc.phase) *
+          dt *
+          archetype.turnRate
+      }
+
+      const directionX = Math.cos(npc.heading)
+      const directionY = Math.sin(npc.heading)
+      this.advanceCellGait(npc, dt, archetype.gaitFrequency)
+
+      if (archetype.locomotion === 'constant' || archetype.locomotion === 'drift') {
+        const driftPulse =
+          archetype.locomotion === 'drift'
+            ? 0.72 + Math.sin(this.elapsed + npc.phase) * 0.18
+            : 1
+        const targetSpeed = archetype.maxSpeed * driftPulse
+        const velocityBlend =
+          1 - Math.exp(-(archetype.locomotion === 'constant' ? 8 : 1.8) * dt)
+        npc.vx += (directionX * targetSpeed - npc.vx) * velocityBlend
+        npc.vy += (directionY * targetSpeed - npc.vy) * velocityBlend
+        this.integrate(npc, dt)
+        continue
+      }
+
       const gait = sampleGait(npc.gaitPhase)
       const brake = brakeForSegment(RULE_SET.npc, gait.segment)
       const damping = Math.exp(-brake * dt)
       const sideSign = npc.gaitCycle % 2 === 0 ? 1 : -1
+      const referenceMass = (archetype.massMin + archetype.massMax) * 0.5
+      const massFactor = Math.sqrt(referenceMass / npc.mass)
       npc.vx =
         npc.vx * damping +
-        (directionX * RULE_SET.npc.burstAcceleration -
-          directionY * RULE_SET.npc.lateralBurst * sideSign) *
+        (directionX * archetype.burstAcceleration -
+          directionY * archetype.lateralBurst * sideSign) *
           gait.drive *
+          massFactor *
           dt
       npc.vy =
         npc.vy * damping +
-        (directionY * RULE_SET.npc.burstAcceleration +
-          directionX * RULE_SET.npc.lateralBurst * sideSign) *
+        (directionY * archetype.burstAcceleration +
+          directionX * archetype.lateralBurst * sideSign) *
           gait.drive *
+          massFactor *
           dt
-      this.limitVelocity(npc, RULE_SET.npc.maxSpeed * Math.sqrt(36 / npc.mass))
+      this.limitVelocity(npc, archetype.maxSpeed * massFactor)
       this.integrate(npc, dt)
     }
   }
 
   consumeNutrients() {
+    if (this.player.absorbedBy) return
     const playerRadius = radiusForMass(this.player.mass)
     for (const nutrient of this.nutrients) {
       if (Math.hypot(nutrient.x - this.player.x, nutrient.y - this.player.y) > playerRadius + 6) continue
@@ -366,38 +428,119 @@ export class Simulation {
   }
 
   resolveCellContacts() {
-    if (this.elapsed < this.invulnerableUntil) return
+    if (this.elapsed < this.invulnerableUntil || this.player.absorbedBy) return
 
     for (let index = 1; index < this.cells.length; index += 1) {
       const npc = this.cells[index]
+      if (npc.absorbedBy || this.isCellBusy(npc.id)) continue
       const contact =
         radiusForMass(this.player.mass) + radiusForMass(npc.mass) * RULE_SET.mass.contactDepthRatio
       if (Math.hypot(npc.x - this.player.x, npc.y - this.player.y) > contact) continue
 
       if (canAbsorb(this.player.mass, npc.mass)) {
-        const gain = npc.mass * RULE_SET.mass.cellEfficiency
-        this.player.mass = Math.min(RULE_SET.mass.maximum, this.player.mass + gain)
-        this.absorbed += 1
-        this.events.push({ type: 'cell-absorbed', x: npc.x, y: npc.y, hue: npc.hue })
-        this.respawnNpc(npc)
+        if (!this.isCellBusy(this.player.id)) this.startAbsorption(this.player, npc)
       } else if (canAbsorb(npc.mass, this.player.mass)) {
-        this.phase = 'game-over'
-        this.events.push({ type: 'player-consumed', x: this.player.x, y: this.player.y, hue: npc.hue })
+        if (!this.isCellBusy(this.player.id)) this.startAbsorption(npc, this.player)
         return
       }
     }
+  }
+
+  /** @param {number} dt @returns {boolean} */
+  updateAbsorptions(dt) {
+    for (let index = this.activeAbsorptions.length - 1; index >= 0; index -= 1) {
+      const state = this.activeAbsorptions[index]
+      const predator = this.cellById(state.predatorId)
+      const prey = this.cellById(state.preyId)
+      if (!predator || !prey) {
+        this.activeAbsorptions.splice(index, 1)
+        continue
+      }
+
+      state.elapsedSeconds += dt
+      const progress = this.clamp(state.elapsedSeconds / state.durationSeconds, 0, 1)
+      const easedProgress = smoothstep(progress)
+      const desiredTransfer =
+        state.startPreyMass * RULE_SET.mass.cellEfficiency * easedProgress
+      const gainedMass = Math.max(0, desiredTransfer - state.transferredMass)
+      state.transferredMass = desiredTransfer
+      predator.mass = Math.min(RULE_SET.mass.maximum, predator.mass + gainedMass)
+      prey.absorptionProgress = progress
+      prey.vx = 0
+      prey.vy = 0
+      prey.heading = Math.atan2(predator.y - prey.y, predator.x - prey.x)
+      const pull = 1 - Math.exp(-RULE_SET.mass.absorptionPullPerSecond * dt)
+      prey.x += (predator.x - prey.x) * pull
+      prey.y += (predator.y - prey.y) * pull
+
+      if (progress < 1) continue
+      this.activeAbsorptions.splice(index, 1)
+      if (prey.kind === 'player') {
+        this.phase = 'game-over'
+        this.events.push({
+          type: 'player-consumed',
+          x: prey.x,
+          y: prey.y,
+          hue: predator.hue,
+        })
+        return true
+      }
+
+      this.absorbed += 1
+      this.events.push({ type: 'cell-absorbed', x: prey.x, y: prey.y, hue: prey.hue })
+      this.respawnNpc(prey)
+    }
+    return false
+  }
+
+  /** @param {CellState} predator @param {CellState} prey */
+  startAbsorption(predator, prey) {
+    if (prey.absorbedBy || this.isCellBusy(predator.id)) return
+    prey.absorbedBy = predator.id
+    prey.absorptionProgress = 0
+    prey.previousAbsorptionProgress = 0
+    prey.vx = 0
+    prey.vy = 0
+    this.activeAbsorptions.push({
+      predatorId: predator.id,
+      preyId: prey.id,
+      elapsedSeconds: 0,
+      durationSeconds: RULE_SET.mass.absorptionDurationSeconds,
+      startPreyMass: prey.mass,
+      transferredMass: 0,
+    })
+  }
+
+  /** @param {string} id */
+  isCellBusy(id) {
+    return this.activeAbsorptions.some(
+      (state) => state.predatorId === id || state.preyId === id,
+    )
+  }
+
+  /** @param {string} id */
+  cellById(id) {
+    return this.cells.find((cell) => cell.id === id)
+  }
+
+  /** @param {CellState} cell */
+  archetypeFor(cell) {
+    const archetype = RULE_SET.npc.archetypes.find((candidate) => candidate.id === cell.speciesId)
+    if (!archetype) throw new Error(`Unknown NPC species: ${cell.speciesId}`)
+    return archetype
   }
 
   /** @param {NutrientState} nutrient */
   respawnNutrient(nutrient) {
     nutrient.x = this.random.between(20, this.worldWidth - 20)
     nutrient.y = this.random.between(20, this.worldHeight - 20)
-    nutrient.mass = this.random.between(RULE_SET.nutrient.massMin, RULE_SET.nutrient.massMax)
+    nutrient.mass = RULE_SET.nutrient.mass
     nutrient.phase = this.random.between(0, TAU)
   }
 
   /** @param {CellState} npc */
   respawnNpc(npc) {
+    const archetype = this.archetypeFor(npc)
     const position = this.ensureSafePosition({
       x: this.random.between(80, this.worldWidth - 80),
       y: this.random.between(80, this.worldHeight - 80),
@@ -408,12 +551,15 @@ export class Simulation {
     npc.previousY = position.y
     npc.vx = 0
     npc.vy = 0
-    npc.mass = this.random.between(RULE_SET.npc.massMin, RULE_SET.npc.massMax)
+    npc.mass = this.random.between(archetype.massMin, archetype.massMax)
     npc.phase = this.random.between(0, TAU)
-    npc.morph = Math.floor(this.random.between(0, 6))
+    npc.morph = archetype.morph
     npc.gaitPhase = this.random.between(0, 1)
     npc.previousGaitPhase = npc.gaitPhase
     npc.gaitCycle += 1
+    npc.absorbedBy = undefined
+    npc.previousAbsorptionProgress = 0
+    npc.absorptionProgress = 0
   }
 
   /** @param {CellState} cell @param {number} dt @param {number} frequency */

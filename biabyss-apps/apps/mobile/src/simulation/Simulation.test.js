@@ -11,7 +11,20 @@ describe('Simulation field', () => {
     )
     expect(simulation.cells).toHaveLength(RULE_SET.npc.count + 1)
     expect(simulation.nutrients).toHaveLength(RULE_SET.nutrient.targetCount)
-    expect(new Set(simulation.cells.slice(1).map((cell) => cell.morph)).size).toBe(6)
+    expect(new Set(simulation.cells.slice(1).map((cell) => cell.speciesId)).size).toBe(5)
+    expect(new Set(simulation.cells.slice(1).map((cell) => cell.morph)).size).toBe(5)
+    expect(RULE_SET.npc.archetypes.map((archetype) => archetype.name)).toEqual([
+      '미립구균',
+      '섬모편모충',
+      '다족유생충',
+      '촉수아메바',
+      '쌍구균',
+    ])
+    expect(simulation.nutrients.every((nutrient) => nutrient.mass === 1)).toBe(true)
+    const speciesCounts = RULE_SET.npc.archetypes.map(
+      (archetype) => simulation.cells.filter((cell) => cell.speciesId === archetype.id).length,
+    )
+    expect(Math.max(...speciesCounts) - Math.min(...speciesCounts)).toBeLessThanOrEqual(1)
     for (const npc of simulation.cells.slice(1)) {
       expect(Math.hypot(npc.x - simulation.player.x, npc.y - simulation.player.y)).toBeGreaterThanOrEqual(
         RULE_SET.npc.safeSpawnDistance - 0.001,
@@ -141,6 +154,81 @@ describe('Simulation field', () => {
     expect(at120.player.gaitCycle).toBe(at60.player.gaitCycle)
   })
 
+  it('moves flee and pursue species in opposite directions inside aggro range', () => {
+    const simulation = new Simulation(1000, 600, 303)
+    const fleeing = simulation.cells.find((cell) => cell.speciesId === 'micrococcus')
+    const pursuing = simulation.cells.find((cell) => cell.speciesId === 'ciliophoran')
+    if (!fleeing || !pursuing) throw new Error('aggro fixtures missing')
+    fleeing.x = simulation.player.x + 200
+    fleeing.y = simulation.player.y - 40
+    fleeing.heading = Math.PI / 2
+    pursuing.x = simulation.player.x + 200
+    pursuing.y = simulation.player.y + 40
+    pursuing.heading = Math.PI / 2
+    const fleeingStartDistance = Math.hypot(
+      fleeing.x - simulation.player.x,
+      fleeing.y - simulation.player.y,
+    )
+    const pursuingStartDistance = Math.hypot(
+      pursuing.x - simulation.player.x,
+      pursuing.y - simulation.player.y,
+    )
+    simulation.start()
+
+    for (let tick = 0; tick < 120; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
+
+    expect(
+      Math.hypot(fleeing.x - simulation.player.x, fleeing.y - simulation.player.y),
+    ).toBeGreaterThan(fleeingStartDistance)
+    expect(
+      Math.hypot(pursuing.x - simulation.player.x, pursuing.y - simulation.player.y),
+    ).toBeLessThan(pursuingStartDistance)
+  })
+
+  it('keeps passive larvoid movement independent from player direction', () => {
+    const leftPlayer = new Simulation(1000, 600, 404)
+    const rightPlayer = new Simulation(1000, 600, 404)
+    const leftLarvoid = leftPlayer.cells.find((cell) => cell.speciesId === 'larvoid')
+    const rightLarvoid = rightPlayer.cells.find((cell) => cell.speciesId === 'larvoid')
+    if (!leftLarvoid || !rightLarvoid) throw new Error('larvoid fixture missing')
+    leftLarvoid.x = rightLarvoid.x = leftPlayer.worldWidth / 2
+    leftLarvoid.y = rightLarvoid.y = leftPlayer.worldHeight / 2
+    leftLarvoid.heading = rightLarvoid.heading = 0.7
+    leftPlayer.player.x = leftLarvoid.x - 120
+    leftPlayer.player.y = leftLarvoid.y
+    rightPlayer.player.x = rightLarvoid.x + 120
+    rightPlayer.player.y = rightLarvoid.y
+    leftPlayer.start()
+    rightPlayer.start()
+
+    for (let tick = 0; tick < 120; tick += 1) {
+      leftPlayer.step(1 / RULE_SET.simulationHz)
+      rightPlayer.step(1 / RULE_SET.simulationHz)
+    }
+
+    expect(leftLarvoid.x).toBe(rightLarvoid.x)
+    expect(leftLarvoid.y).toBe(rightLarvoid.y)
+    expect(Math.hypot(leftLarvoid.vx, leftLarvoid.vy)).toBeCloseTo(
+      RULE_SET.npc.archetypes[2].maxSpeed,
+      2,
+    )
+  })
+
+  it('keeps the eightfold population finite and stable for ten simulated seconds', () => {
+    const simulation = new Simulation(1000, 600, 0x51a7)
+    simulation.start()
+    simulation.invulnerableUntil = Number.POSITIVE_INFINITY
+    for (let tick = 0; tick < RULE_SET.simulationHz * 10; tick += 1) {
+      simulation.step(1 / RULE_SET.simulationHz)
+    }
+
+    expect(simulation.cells).toHaveLength(54 * RULE_SET.world.populationMultiplier + 1)
+    expect(simulation.nutrients).toHaveLength(320 * RULE_SET.world.populationMultiplier)
+    for (const cell of simulation.cells) {
+      expect([cell.x, cell.y, cell.vx, cell.vy, cell.mass].every(Number.isFinite)).toBe(true)
+    }
+  })
+
   it('freezes simulation state while paused', () => {
     const simulation = new Simulation(1000, 600, 707)
     simulation.start()
@@ -161,18 +249,87 @@ describe('Simulation field', () => {
     expect(simulation.absorbed).toBe(1)
     expect(simulation.player.mass).toBeGreaterThan(previousMass)
     expect(simulation.events.map((event) => event.type)).toContain('nutrient-absorbed')
+    expect(simulation.takeEvents().map((event) => event.type)).toContain('nutrient-absorbed')
+    expect(simulation.takeEvents()).toHaveLength(0)
   })
 
-  it('ends the run when a larger predator contacts the player after protection', () => {
+  it('pulls in a smaller aggressive cell before completing absorption', () => {
     const simulation = new Simulation(1000, 600, 707)
-    const predator = simulation.cells[1]
+    const prey = simulation.cells.find((cell) => cell.speciesId === 'ciliophoran')
+    if (!prey) throw new Error('ciliophoran fixture missing')
+    simulation.nutrients.length = 0
+    prey.x = simulation.player.x
+    prey.y = simulation.player.y
+    prey.mass = 10
+    const previousMass = simulation.player.mass
+    const speciesId = prey.speciesId
+    simulation.start()
+    simulation.elapsed = simulation.invulnerableUntil
+    simulation.step(1 / RULE_SET.simulationHz)
+    expect(simulation.phase).toBe('running')
+    expect(simulation.activeAbsorptions).toHaveLength(1)
+    expect(prey.absorbedBy).toBe(simulation.player.id)
+    expect(simulation.absorbed).toBe(0)
+
+    for (let tick = 0; tick < 20; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
+    expect(prey.absorptionProgress).toBeGreaterThan(0)
+    expect(prey.absorptionProgress).toBeLessThan(1)
+    expect(simulation.player.mass).toBeGreaterThan(previousMass)
+    expect(simulation.player.mass).toBeLessThan(previousMass + 10 * RULE_SET.mass.cellEfficiency)
+    expect(simulation.absorbed).toBe(0)
+
+    for (let tick = 0; tick < 60 && simulation.activeAbsorptions.length > 0; tick += 1) {
+      simulation.step(1 / RULE_SET.simulationHz)
+    }
+    expect(simulation.activeAbsorptions).toHaveLength(0)
+    expect(simulation.absorbed).toBe(1)
+    expect(simulation.player.mass).toBeCloseTo(
+      previousMass + 10 * RULE_SET.mass.cellEfficiency,
+      8,
+    )
+    expect(prey.speciesId).toBe(speciesId)
+    expect(prey.absorbedBy).toBeUndefined()
+    expect(simulation.events.map((event) => event.type)).toContain('cell-absorbed')
+  })
+
+  it('prevents duplicate prey claims and simultaneous predator targets', () => {
+    const simulation = new Simulation(1000, 600, 808)
+    const prey = simulation.cells.filter((cell) => cell.kind === 'npc').slice(0, 2)
+    simulation.nutrients.length = 0
+    for (const cell of prey) {
+      cell.x = simulation.player.x
+      cell.y = simulation.player.y
+      cell.mass = 5
+    }
+    simulation.start()
+    simulation.elapsed = simulation.invulnerableUntil
+    simulation.step(1 / RULE_SET.simulationHz)
+
+    expect(simulation.activeAbsorptions).toHaveLength(1)
+    expect(prey.filter((cell) => cell.absorbedBy === simulation.player.id)).toHaveLength(1)
+  })
+
+  it('delays game over until the player suction transition completes', () => {
+    const simulation = new Simulation(1000, 600, 707)
+    const predator = simulation.cells.find((cell) => cell.speciesId === 'tentacle-amoeba')
+    if (!predator) throw new Error('tentacle amoeba fixture missing')
+    simulation.nutrients.length = 0
     predator.x = simulation.player.x
     predator.y = simulation.player.y
     predator.mass = simulation.player.mass * 2
     simulation.start()
     simulation.elapsed = simulation.invulnerableUntil
-    simulation.step(1 / 60)
+    simulation.step(1 / RULE_SET.simulationHz)
+    expect(simulation.phase).toBe('running')
+    expect(simulation.activeAbsorptions).toHaveLength(1)
+    for (let tick = 0; tick < 20; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
+    expect(simulation.phase).toBe('running')
+    expect(simulation.player.absorptionProgress).toBeGreaterThan(0)
+    for (let tick = 0; tick < 60 && simulation.phase === 'running'; tick += 1) {
+      simulation.step(1 / RULE_SET.simulationHz)
+    }
     expect(simulation.phase).toBe('game-over')
+    expect(simulation.player.absorptionProgress).toBe(1)
     expect(simulation.events.map((event) => event.type)).toContain('player-consumed')
   })
 })

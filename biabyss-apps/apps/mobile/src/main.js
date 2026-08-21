@@ -203,7 +203,12 @@ function frame(now) {
   }
   if (steps === RULE_SET.maxCatchUpSteps) accumulator = 0
 
-  presentation.render(now / 1000, accumulator / fixedStepSeconds, frameSeconds)
+  presentation.render(
+    now / 1000,
+    accumulator / fixedStepSeconds,
+    frameSeconds,
+    simulation.takeEvents(),
+  )
   hudClock += frameSeconds
   if (hudClock >= 0.1) {
     hudClock = 0

@@ -58,11 +58,15 @@ interface CellState {
   position: Vec2
   velocity: Vec2
   mass: number
+  speciesId: 'player' | 'micrococcus' | 'ciliophoran' | 'larvoid' | 'tentacle-amoeba' | 'diplococcus'
   life: 'alive' | 'consumed'
   invulnerableUntilTick: number
   previousGaitPhase: number
   gaitPhase: number
   gaitCycle: number
+  absorbedBy?: EntityId
+  previousAbsorptionProgress: number
+  absorptionProgress: number
   npcBrain?: NpcBrainState
 }
 ```
@@ -71,6 +75,10 @@ interface CellState {
 함께 읽는다. `previousGaitPhase`는 `previousPosition`과 같은 렌더 보간 경계이고, Renderer는 동일한 alpha로
 위치와 gait를 보간한다. `gaitCycle`은 좌우 꿈틀 방향을 안정적으로 교대하는 정수다. `radius`, `speedLimit`,
 `isThreat`는 저장 필드가 아니라 RuleSet과 현재 상태로 계산하는 파생 값이다.
+
+`speciesId`는 NPC의 형태·기동·어그로 프로필을 RuleSet에서 찾는 안정 ID다. `absorbedBy`가 있으면 해당 Cell은
+자체 이동과 새 충돌 후보에서 제외되고, `absorptionProgress`는 fixed tick에서만 `0..1`로 증가한다.
+`previousAbsorptionProgress`는 위치와 같은 alpha로 빨림 변형을 보간하기 위한 직전 tick 값이다.
 
 ### NutrientState
 
@@ -87,12 +95,28 @@ interface NutrientState {
 
 ```ts
 interface NpcBrainState {
-  mode: 'wander' | 'pursue' | 'flee'
+  mode: 'wander' | 'pursue' | 'flee' | 'passive'
   heading: number
   nextDecisionTick: number
   targetId?: EntityId
 }
 ```
+
+### AbsorptionState
+
+```ts
+interface AbsorptionState {
+  predatorId: EntityId
+  preyId: EntityId
+  elapsedSeconds: number
+  durationSeconds: number
+  startPreyMass: number
+  transferredMass: number
+}
+```
+
+포식 가능 여부와 대상 선점은 시작 tick에 확정한다. 전이 중 prey는 predator 쪽으로 당겨지고 획득 질량은
+진행률 차이만큼 점진 이전된다. 완료 시 NPC prey는 respawn하고 Player prey는 `GAME_OVER`로 전환한다.
 
 ## 4. Value Object
 

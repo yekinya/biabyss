@@ -41,10 +41,13 @@ BIABYSS는 빛나는 미생물 심연에서 하나의 세포를 조종해 더 �
 | Cell | 질량·위치·속도·행동 주체를 가진 생명체 |
 | Player Cell | 사람의 Input Intent를 따르는 유일한 Cell |
 | NPC Cell | RuleSet과 감지 결과로 행동하는 Cell |
+| Cell Species | 형태·기동 방식·어그로 프로필·감지 반경을 묶는 NPC 종 정의 |
+| Aggro Profile | Player 감지 시 `pursue | flee | passive` 중 어떤 반응을 하는지 정한 불변 성향 |
 | Nutrient | 의사결정 없이 흡수되는 작은 질량 공급원 |
 | Mass | 크기, 기동성과 포식 관계를 결정하는 핵심 스칼라 |
 | Radius | Mass에서 계산되는 충돌·표현 반경 |
 | Absorption | 큰 Cell이 작은 대상의 질량 일부 또는 전부를 얻는 판정 |
+| Absorption Transition | 포식 판정 뒤 대상이 포식자에게 당겨지고 질량이 이전되는 시간 구간 |
 | Threat | Player를 흡수할 수 있는 NPC Cell |
 | Prey | Player가 흡수할 수 있는 NPC Cell 또는 Nutrient |
 | RuleSet | 한 Run의 모든 판정 수치와 한계를 가진 불변 설정 |
@@ -79,6 +82,8 @@ BOOT → READY → RUNNING ⇄ PAUSED → GAME_OVER
 8. NPC는 Field 밖으로 이탈하지 않으며 spawn 즉시 Player와 충돌하지 않는다.
 9. 모든 난수는 Run seed에서 나온다. 테스트에서 같은 seed와 입력은 같은 결과를 낸다.
 10. 일시정지와 resume은 숨은 질량 증가·NPC 순간 이동·즉시 사망을 만들지 않는다.
+11. 흡수 전이 중인 Cell은 다른 포식자의 새 흡수 대상으로 중복 선택되지 않는다.
+12. NPC 어그로 성향과 감지 반경은 Species RuleSet에서만 결정하며 Mass는 먹고먹히는 판정에만 사용한다.
 
 ## 6. 도메인 경계
 

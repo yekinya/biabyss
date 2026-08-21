@@ -77,7 +77,7 @@ export class BiabyssRenderer {
     this.fieldBoundary = this.createFieldBoundary()
     this.scene.add(this.fieldBoundary)
 
-    this.cellRenderer = new CellRenderer(this.scene)
+    this.cellRenderer = new CellRenderer(this.scene, simulation.cells.length)
     this.ambientParticles = new AmbientParticles(
       this.scene,
       simulation.worldWidth,
@@ -156,8 +156,8 @@ export class BiabyssRenderer {
     this.trails.setPixelRatio(this.pixelRatio)
   }
 
-  /** @param {number} time @param {number} alpha @param {number} dt */
-  render(time, alpha, dt) {
+  /** @param {number} time @param {number} alpha @param {number} dt @param {import('../../simulation/Simulation.js').SimulationEvent[]} events */
+  render(time, alpha, dt, events) {
     if (this.contextLost) return
     this.frame += 1
     this.fieldMaterial.uniforms.uTime.value = time
@@ -173,13 +173,13 @@ export class BiabyssRenderer {
 
     if (!this.reducedMotion) {
       if (this.frame % 2 === 0) this.trails.emit(this.simulation.player)
-      if (this.frame % 7 === 0) {
-        for (let index = 1; index < this.simulation.cells.length; index += 3) {
+      if (this.frame % 12 === 0) {
+        for (let index = 1; index < this.simulation.cells.length; index += 32) {
           this.trails.emit(this.simulation.cells[index])
         }
       }
     }
-    for (const event of this.simulation.events) this.trails.burst(event)
+    for (const event of events) this.trails.burst(event)
     this.trails.update(dt)
     this.followPlayer(dt)
     this.composer.render(dt)
@@ -229,6 +229,12 @@ export class BiabyssRenderer {
   }
 
   diagnostics() {
+    const speciesCounts = Object.fromEntries(
+      RULE_SET.npc.archetypes.map((archetype) => [
+        archetype.name,
+        this.simulation.cells.filter((cell) => cell.speciesId === archetype.id).length,
+      ]),
+    )
     return {
       engine: 'three-webgl',
       canvasCount: this.host.querySelectorAll('canvas').length,
@@ -246,7 +252,10 @@ export class BiabyssRenderer {
         (this.simulation.worldWidth * this.simulation.worldHeight) /
         (this.simulation.viewportWidth * this.simulation.viewportHeight),
       cells: this.simulation.cells.length,
+      cellBatching: 'instanced-mesh',
+      speciesCounts,
       nutrients: this.simulation.nutrients.length,
+      activeAbsorptions: this.simulation.activeAbsorptions.length,
       trailCapacity: RULE_SET.rendering.trailCapacity,
       drawCalls: this.drawCalls,
       joystickActive: this.joystickState.active,
