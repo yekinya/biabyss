@@ -20,7 +20,7 @@ project/02-game/content/resources/
 ## 2. 이름 규칙
 
 - shader: `cell-membrane.frag.glsl`, `world-fog.frag.glsl`
-- palette/material ID: `cell.player.cyan.v1`
+- palette/material ID: `cell.player.microscope.v2`
 - audio: `<domain>.<event>.<variant>.<ext>`
 - image: `<surface>-<purpose>-<density>.<ext>`
 - ID는 경로와 분리하며 코드가 파일 경로를 조립하지 않는다.

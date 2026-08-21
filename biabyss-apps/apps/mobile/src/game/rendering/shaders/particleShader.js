@@ -26,8 +26,8 @@ export const particleFragmentShader = /* glsl */ `
     vec2 p = gl_PointCoord - 0.5;
     float radius = length(p);
     if (radius > 0.5) discard;
-    float core = exp(-radius * radius * 28.0);
-    float halo = exp(-radius * radius * 7.0) * 0.4;
-    gl_FragColor = vec4(vColor * (core * 2.5 + halo), (core + halo) * vAlpha);
+    float body = 1.0 - smoothstep(0.28, 0.5, radius);
+    float center = 1.0 - smoothstep(0.0, 0.42, radius);
+    gl_FragColor = vec4(vColor * (0.72 + center * 0.28), body * vAlpha);
   }
 `

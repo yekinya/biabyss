@@ -2,22 +2,23 @@
 
 ## 1. 핵심 문장
 
-“차갑고 어두운 미시 우주 속에서 반투명 생명체가 작은 성운 같은 내부 빛을 품고 천천히 꿈틀거린다.”
+“밝은 현미경 배지 속 반투명 생명체가 어두운 막과 미세 과립을 품고 한 발씩 수축하며 나아간다.”
 
-우주를 모티브로 삼되 행성·우주선·별자리를 직접 묘사하지 않는다. cyan·violet·magenta 광운, 먼 별처럼
-반짝이는 미세 포자와 점액성 안개를 겹쳐 `cosmic microbial deep`을 만든다. 어디까지나 세포와 유체가 있는
-미생물 세계이며, 우주 사진을 배경으로 붙이지 않는다.
+실제 bright-field/phase-contrast 현미경의 회백 배지, 이중 윤곽, 반투명 세포질, 작은 검은 과립과 투명 액포를
+우선한다. 우주 모티브는 사진이나 발광 팔레트가 아니라 과립이 응집·확산하는 추상적 리듬에만 남긴다. 사용자가
+제공한 참고 이미지는 형태·광학·색 분석에만 사용하고 runtime bitmap이나 texture로 복제하지 않는다.
 
 ## 2. 색 체계
 
 | 역할 | 기준 색 | 보조 신호 |
 |---|---|---|
-| 배경 | `#030710` | 청록·자주 저채도 안개 |
-| Player | cyan `#71F7FF` | 흰색 rim, 안정된 heartbeat |
-| 작은 Prey | 녹색·청색 | 안쪽으로 수축하는 pulse |
-| 큰 Threat | magenta·적자주 | 바깥으로 팽창하는 pulse, 낮은 주파수 |
-| Nutrient | cyan/violet 점광 | 느린 호흡 |
-| 위험 순간 | warm amber | 짧은 vignette와 방향 cue |
+| Stage 1 배지 | 회백 `#B8BDBB` | 옅은 청회 광학 얼룩 |
+| Stage 2 배지 | 청록회 `#789CA0` | 황록·황토 응집물 |
+| Stage 3 배지 | 회녹 `#9AA092` | 올리브·갈색 detritus |
+| Player | 반투명 회백·연녹 | 진한 이중 rim, 일정한 쌍축 |
+| 작은 Prey | 옅은 녹회 | 안쪽 수축 pulse |
+| 큰 Threat | 짙은 갈회·자회 | 굵은 이중 rim, 느린 변형 |
+| Nutrient | 회녹·황록 미립자 | 약한 크기 호흡 |
 
 색각 차이를 위해 위협은 색 외에도 굵은 rim, 느린 변형, 크기 대비로 표현한다.
 
@@ -25,17 +26,17 @@
 
 뒤에서 앞으로:
 
-1. 외부 aura: `UnrealBloomPass`가 공유하는 emissive mask
-2. membrane shadow: 반투명 어두운 외곽
-3. membrane rim: 얇은 Fresnel 유사 하이라이트
-4. cytoplasm: domain-warped noise와 완만한 gradient
-5. nucleoid strand: 느리게 변형되는 선 또는 ribbon
-6. ribosome/granule: 적은 수의 내부 particle
-7. specular arc: 화면 광원 방향을 공유하는 짧은 highlight
-8. gameplay cue: 보호, 위험, 흡수 event ring
+1. phase halo: 막 바깥의 매우 얇은 밝고 어두운 광학 이중선
+2. membrane shadow: 짙은 회색·갈색 외곽
+3. cytoplasm: 배지보다 약간 밝거나 어두운 반투명 회백 면
+4. vacuole: 투명한 중심과 어두운 가는 테두리의 불규칙 원
+5. movement axes: 진행축 위의 두 짙은 내부 중심
+6. granule: 크기와 농도가 다른 검은색·올리브 미세 점
+7. cilia grain: 실루엣 가장자리의 매우 짧은 자글거림
+8. gameplay cue: 색보다 rim 두께·수축 방향·크기 차이
 
 Cell은 공유 PlaneGeometry와 종류별 공유 ShaderMaterial을 사용한다. 개별 blur filter를 붙이지 않고 화면 전체
-`EffectComposer` bloom으로 발광을 합성한다.
+`EffectComposer`는 얇은 현미경 halo가 뭉개지지 않는 최소 강도로만 사용한다.
 
 형태는 원형 cocci, 타원형 yeast-like, 간균 bacillus, 쌍구균 diplococcus, 휘어진 vibrio, 불규칙 amoeboid의
 6종 SDF를 기준으로 한다. 실제 종을 재현한다고 주장하지 않고 현미경 관찰 질감에서 형태 언어만 가져온다.
@@ -44,19 +45,19 @@ Cell은 공유 PlaneGeometry와 종류별 공유 ShaderMaterial을 사용한다.
 
 - 경계 wobble: 저주파 noise 2~3 octave, 진폭은 반경의 2~4%
 - 이동 변형: velocity 방향으로 늘어나고 수직 방향으로 압축
-- 보행형 추진: 사인 주기의 전반에는 진행 방향 앞막이 길게 뻗고, 후반에는 뒤막과 내부 물질이 지연되어
-  따라붙는다. 화면 변형은 충돌 반경을 바꾸지 않는다.
+- 보행형 추진: Simulation `gaitPhase`의 reach에서 앞 이동축과 앞막이 먼저 뻗고, drive에서 몸체가 급가속한
+  뒤 catch에서 뒤 이동축·세포질·과립이 끌려와 합쳐진다. rest에서는 실제 속도와 형태가 함께 멈춘다.
+  화면 변형은 충돌 반경을 바꾸지 않는다.
 - 내부 관성: Cell 회전과 독립적으로 늦게 따라오는 offset
-- 쌍광핵: 속도가 낮을 때 중심 가까이 모이고, 이동할 때 진행축으로 벌어지며 서로 다른 위상으로 호흡
+- 쌍이동축: 별도 시간 애니메이션이 아니라 `gaitPhase`로 벌어지고 가까워지며 실제 추진 펄스와 일치
 - heartbeat: gameplay 판정과 무관한 작은 scale 변화
 - 흡수: 대상 방향으로 막이 당겨졌다가 질량 증가와 함께 복원
 - 사망: 즉시 사라지지 않고 외곽 붕괴 → 빛 소실 → 입자 분산 순서, 전체 600ms 이하
 - 이동 trail: 진행 반대쪽에서 점액성 point가 방출되고 수명 동안 크기와 alpha가 함께 감소
 
-내부 광점은 나선형 흐름을 따라 바깥으로 퍼졌다가 중심으로 모이고, 서로 다른 위상으로 짧게 반짝인다.
-속도가 높을수록 흐름과 반짝임이 빨라진다. 은하를 연상시키는 응집·확산 리듬은 허용하지만 실제 별·천체를
-복제하지 않는다. 외부막은 실루엣을 읽을 수 있는 얇고 부드러운 rim만 남기고, bloom의 가장 밝은 지점은
-외부 aura가 아니라 내부 광점과 쌍광핵에 둔다.
+내부 과립은 발광하지 않는다. reach에서 앞축 주변으로 느리게 당겨지고, drive에 몸체와 함께 이동하며,
+catch에서 뒤쪽 과립이 지연되어 회수된다. 액포는 세포질 안에서 미세하게 흔들리지만 gait와 무관한 빠른 공전·
+반짝임은 사용하지 않는다. bloom은 광학 halo가 번지지 않을 정도로 최소화한다.
 
 ## 5. 조이패드
 
@@ -68,20 +69,19 @@ Cell은 공유 PlaneGeometry와 종류별 공유 ShaderMaterial을 사용한다.
 
 ## 6. 배경
 
-- 단색 clear 위에 저채도 cyan·violet·magenta noise field를 합성한다.
-- 배경은 bitmap을 반복하지 않고, 4 octave 이하의 noise와 domain warp를 하나의 field shader에서 계산한다.
-- 큰 광운, 가는 filament와 미세 포자는 서로 다른 시간 위상으로 움직여 고정 무늬처럼 보이지 않게 한다.
-- 작은 ambient particle은 먼 별을 연상시키되 미세 포자라는 형태 언어를 유지하며 약한 parallax를 만든다.
-- 별자리, 행성, 우주선과 실제 우주 사진은 사용하지 않는다.
-- 감소 모션에서는 공간층의 이동량과 반짝임 진폭을 낮추되 완전히 정지된 이미지로 바꾸지 않는다.
+- Stage 1 `bright-field`: 밝은 회백 배지, 옅은 청회 얼룩, 낮은 밀도의 투명 기포.
+- Stage 2 `algae-bloom`: 청록회 배지, 황록·황토 응집물, 중간 밀도의 부유 과립.
+- Stage 3 `detritus-deep`: 회녹 배지, 올리브·갈색 detritus, 짙은 작은 입자와 불규칙 덩어리.
+- 배경은 bitmap을 반복하지 않고 4 octave 이하 noise와 domain warp를 하나의 field shader에서 계산한다.
+- Stage는 Player Mass 성장률에서 연속 보간하는 Presentation 값이며 gameplay 판정에는 사용하지 않는다.
 
 ## 7. 후처리 예산
 
 | Tier | 허용 |
 |---|---|
-| low | membrane shader, 단순 aura, vignette |
-| medium | 절반 해상도 bloom, 약한 displacement, 흡수 ring |
-| high | 다단 bloom, domain warp, 제한적 색수차와 shockwave |
+| low | membrane shader, 얇은 광학 halo, vignette |
+| medium | 최소 강도 bloom, 약한 displacement, 흡수 ring |
+| high | 최소 강도 bloom, domain warp, 제한적 색수차와 shockwave |
 
 색수차, noise, blur는 텍스트와 gameplay silhouette을 흐리지 않게 약하게 사용한다. `prefers-reduced-motion` 또는
 기기 설정에서 shockwave, 큰 scale pulse와 화면 흔들림을 제거한다.
@@ -91,3 +91,7 @@ Cell은 공유 PlaneGeometry와 종류별 공유 ShaderMaterial을 사용한다.
 Title과 10Hz 이하 저주파 HUD는 DOM projection을 허용한다. 숫자는 고정 폭 font와 너비를 사용해 layout을
 흔들지 않는다. 세포, particle, trail, world marker처럼 gameplay 공간에 속한 시각과 상호작용은 DOM에
 중복 구현하지 않는다.
+
+Title overlay는 배경 배양액을 가리는 검은 광채 대신 옅은 회백 표본판과 회녹 잉크를 사용한다. 시작 문구는
+bright-field 관찰과 한 발씩 수축하는 조작을 설명하고, 포식자 cue를 발광 색이 아니라 크기와 진한 윤곽으로
+안내한다.

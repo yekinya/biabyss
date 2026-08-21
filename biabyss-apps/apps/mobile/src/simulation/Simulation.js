@@ -1,6 +1,7 @@
 // @ts-check
 
 import { canAbsorb, radiusForMass } from '../domain/rules/mass.js'
+import { advanceGait, sampleGait } from '../domain/rules/gait.js'
 import { RULE_SET } from '../domain/rules/ruleSet.js'
 import { SeededRandom, stratifiedPositions } from './random.js'
 
@@ -21,6 +22,9 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  * @property {number} heading
  * @property {number} morph
  * @property {number} hue
+ * @property {number} previousGaitPhase
+ * @property {number} gaitPhase
+ * @property {number} gaitCycle
  */
 
 /**
@@ -42,6 +46,17 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  */
 
 const TAU = Math.PI * 2
+
+/**
+ * @param {{reachBrakePerSecond: number, driveBrakePerSecond: number, catchBrakePerSecond: number, restBrakePerSecond: number}} config
+ * @param {'reach' | 'drive' | 'catch' | 'rest'} segment
+ */
+function brakeForSegment(config, segment) {
+  if (segment === 'reach') return config.reachBrakePerSecond
+  if (segment === 'drive') return config.driveBrakePerSecond
+  if (segment === 'catch') return config.catchBrakePerSecond
+  return config.restBrakePerSecond
+}
 
 export class Simulation {
   /** @param {number} viewportWidth @param {number} viewportHeight @param {number} [seed] */
@@ -87,8 +102,11 @@ export class Simulation {
       mass: RULE_SET.player.initialMass,
       phase: this.random.between(0, TAU),
       heading: 0,
-      morph: 5,
+      morph: 1,
       hue: 0.49,
+      previousGaitPhase: 0,
+      gaitPhase: 0,
+      gaitCycle: 0,
     }
   }
 
@@ -147,6 +165,7 @@ export class Simulation {
   /** @param {number} index @param {number} x @param {number} y @returns {CellState} */
   createNpc(index, x, y) {
     const heading = this.random.between(0, TAU)
+    const gaitPhase = this.random.between(0, 1)
     return {
       id: `cell-npc-${index}`,
       kind: 'npc',
@@ -154,13 +173,16 @@ export class Simulation {
       y,
       previousX: x,
       previousY: y,
-      vx: Math.cos(heading) * this.random.between(5, 18),
-      vy: Math.sin(heading) * this.random.between(5, 18),
+      vx: 0,
+      vy: 0,
       mass: this.random.between(RULE_SET.npc.massMin, RULE_SET.npc.massMax),
       phase: this.random.between(0, TAU),
       heading,
       morph: index % 6,
       hue: [0.48, 0.37, 0.78, 0.91, 0.12, 0.56][index % 6],
+      previousGaitPhase: gaitPhase,
+      gaitPhase,
+      gaitCycle: index,
     }
   }
 
@@ -224,6 +246,7 @@ export class Simulation {
     for (const cell of this.cells) {
       cell.previousX = cell.x
       cell.previousY = cell.y
+      cell.previousGaitPhase = cell.gaitPhase
     }
   }
 
@@ -234,41 +257,48 @@ export class Simulation {
     const dy = this.input.y - player.y
     const distance = Math.hypot(dx, dy)
 
-    if (this.input.active && distance > RULE_SET.player.deadZone) {
+    const moving = this.input.active && this.input.strength > 0 && distance > RULE_SET.player.deadZone
+    if (moving) {
       const directionX = dx / distance
       const directionY = dy / distance
       const massFactor = Math.sqrt(RULE_SET.player.initialMass / player.mass)
-      const strideWave = Math.sin(
-        this.elapsed * RULE_SET.player.wriggleFrequency * TAU + player.phase,
-      )
-      const stride =
-        RULE_SET.player.strideMinimum +
-        (1 - RULE_SET.player.strideMinimum) * (0.5 + strideWave * 0.5)
       const inputStrength = this.input.strength
-      player.vx +=
-        (directionX * RULE_SET.player.acceleration * stride -
-          directionY * strideWave * RULE_SET.player.wriggleAmplitude) *
-        inputStrength *
-        massFactor *
-        dt
-      player.vy +=
-        (directionY * RULE_SET.player.acceleration * stride +
-          directionX * strideWave * RULE_SET.player.wriggleAmplitude) *
-        inputStrength *
-        massFactor *
-        dt
+      player.heading = Math.atan2(directionY, directionX)
+      this.advanceCellGait(
+        player,
+        dt,
+        RULE_SET.player.gaitFrequency * (0.65 + inputStrength * 0.35),
+      )
+      const gait = sampleGait(player.gaitPhase)
+      const brake = brakeForSegment(RULE_SET.player, gait.segment)
+      const damping = Math.exp(-brake * dt)
+      const sideSign = player.gaitCycle % 2 === 0 ? 1 : -1
+      player.vx =
+        player.vx * damping +
+        (directionX * RULE_SET.player.burstAcceleration -
+          directionY * RULE_SET.player.lateralBurst * sideSign) *
+          gait.drive *
+          inputStrength *
+          massFactor *
+          dt
+      player.vy =
+        player.vy * damping +
+        (directionY * RULE_SET.player.burstAcceleration +
+          directionX * RULE_SET.player.lateralBurst * sideSign) *
+          gait.drive *
+          inputStrength *
+          massFactor *
+          dt
+      this.limitVelocity(
+        player,
+        RULE_SET.player.maxSpeed * (0.35 + inputStrength * 0.65) * massFactor,
+      )
+    } else {
+      player.gaitPhase = 0
+      const damping = Math.exp(-RULE_SET.player.restBrakePerSecond * dt)
+      player.vx *= damping
+      player.vy *= damping
     }
-
-    const drag = RULE_SET.player.dragPerSecond ** dt
-    player.vx *= drag
-    player.vy *= drag
-    const inputSpeedFactor = this.input.active ? 0.35 + this.input.strength * 0.65 : 1
-    this.limitVelocity(
-      player,
-      RULE_SET.player.maxSpeed *
-        inputSpeedFactor *
-        Math.sqrt(RULE_SET.player.initialMass / player.mass),
-    )
     this.integrate(player, dt)
   }
 
@@ -285,22 +315,38 @@ export class Simulation {
       const protectedFromThreat = this.elapsed < this.invulnerableUntil && pursues
       const intent = aware ? (flees || protectedFromThreat ? -1 : pursues ? 1 : 0) : 0
 
-      npc.heading += Math.sin(this.elapsed * 0.68 + npc.phase) * dt * 0.72
+      npc.heading += Math.sin(this.elapsed * 0.68 + npc.phase) * dt * 0.38
       const wanderX = Math.cos(npc.heading)
       const wanderY = Math.sin(npc.heading)
       const targetX = dx / distance
       const targetY = dy / distance
-      const wriggle = Math.sin(this.elapsed * (1.35 + (index % 5) * 0.11) + npc.phase)
-      npc.vx +=
-        (wanderX * RULE_SET.npc.acceleration + targetX * intent * RULE_SET.npc.acceleration * 1.35 -
-          targetY * wriggle * 9) *
-        dt
-      npc.vy +=
-        (wanderY * RULE_SET.npc.acceleration + targetY * intent * RULE_SET.npc.acceleration * 1.35 +
-          targetX * wriggle * 9) *
-        dt
-      npc.vx *= 0.72 ** dt
-      npc.vy *= 0.72 ** dt
+      let directionX = wanderX + targetX * intent * 1.35
+      let directionY = wanderY + targetY * intent * 1.35
+      const directionLength = Math.max(0.001, Math.hypot(directionX, directionY))
+      directionX /= directionLength
+      directionY /= directionLength
+      npc.heading = Math.atan2(directionY, directionX)
+      this.advanceCellGait(
+        npc,
+        dt,
+        RULE_SET.npc.gaitFrequency * (0.88 + (index % 5) * 0.035),
+      )
+      const gait = sampleGait(npc.gaitPhase)
+      const brake = brakeForSegment(RULE_SET.npc, gait.segment)
+      const damping = Math.exp(-brake * dt)
+      const sideSign = npc.gaitCycle % 2 === 0 ? 1 : -1
+      npc.vx =
+        npc.vx * damping +
+        (directionX * RULE_SET.npc.burstAcceleration -
+          directionY * RULE_SET.npc.lateralBurst * sideSign) *
+          gait.drive *
+          dt
+      npc.vy =
+        npc.vy * damping +
+        (directionY * RULE_SET.npc.burstAcceleration +
+          directionX * RULE_SET.npc.lateralBurst * sideSign) *
+          gait.drive *
+          dt
       this.limitVelocity(npc, RULE_SET.npc.maxSpeed * Math.sqrt(36 / npc.mass))
       this.integrate(npc, dt)
     }
@@ -365,6 +411,16 @@ export class Simulation {
     npc.mass = this.random.between(RULE_SET.npc.massMin, RULE_SET.npc.massMax)
     npc.phase = this.random.between(0, TAU)
     npc.morph = Math.floor(this.random.between(0, 6))
+    npc.gaitPhase = this.random.between(0, 1)
+    npc.previousGaitPhase = npc.gaitPhase
+    npc.gaitCycle += 1
+  }
+
+  /** @param {CellState} cell @param {number} dt @param {number} frequency */
+  advanceCellGait(cell, dt, frequency) {
+    const next = advanceGait(cell.gaitPhase, dt, frequency)
+    cell.gaitPhase = next.phase
+    cell.gaitCycle += next.completedCycles
   }
 
   /** @param {CellState} cell @param {number} dt */

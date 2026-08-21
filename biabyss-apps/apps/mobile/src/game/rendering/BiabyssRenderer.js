@@ -8,6 +8,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { CellRenderer } from './CellRenderer.js'
 import { JoystickRenderer } from './JoystickRenderer.js'
+import { opticalStageId, resolveOpticalStage } from './microscopeStage.js'
 import {
   AmbientParticles,
   FluidTrails,
@@ -22,7 +23,7 @@ export class BiabyssRenderer {
     this.host = host
     this.simulation = simulation
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x01070b)
+    this.scene.background = new THREE.Color(0xb8bdbb)
     this.overlayScene = new THREE.Scene()
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200)
     this.overlayCamera = new THREE.OrthographicCamera(0, 1, 1, 0, 0.1, 20)
@@ -37,7 +38,7 @@ export class BiabyssRenderer {
     })
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.08
+    this.renderer.toneMappingExposure = 0.92
     this.renderer.autoClear = false
     this.renderer.domElement.dataset.engine = 'three-webgl'
     this.host.replaceChildren(this.renderer.domElement)
@@ -63,6 +64,7 @@ export class BiabyssRenderer {
         uMotionScale: { value: this.reducedMotion ? 0.18 : 1 },
         uSeed: { value: simulation.seed % 997 },
         uWorldSize: { value: new THREE.Vector2(simulation.worldWidth, simulation.worldHeight) },
+        uOpticalStage: { value: 0 },
       },
       vertexShader: fieldVertexShader,
       fragmentShader: fieldFragmentShader,
@@ -75,7 +77,7 @@ export class BiabyssRenderer {
     this.fieldBoundary = this.createFieldBoundary()
     this.scene.add(this.fieldBoundary)
 
-    this.cellRenderer = new CellRenderer(this.scene, this.reducedMotion)
+    this.cellRenderer = new CellRenderer(this.scene)
     this.ambientParticles = new AmbientParticles(
       this.scene,
       simulation.worldWidth,
@@ -91,9 +93,9 @@ export class BiabyssRenderer {
     this.renderPass = new RenderPass(this.scene, this.camera)
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(1, 1),
-      this.reducedMotion ? 0.28 : 0.58,
-      0.48,
-      0.62,
+      this.reducedMotion ? 0.025 : 0.055,
+      0.24,
+      0.92,
     )
     this.outputPass = new OutputPass()
     this.composer = new EffectComposer(this.renderer)
@@ -120,10 +122,10 @@ export class BiabyssRenderer {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     const material = new THREE.LineBasicMaterial({
-      color: 0x62d7d4,
+      color: 0x35423e,
       transparent: true,
-      opacity: 0.18,
-      blending: THREE.AdditiveBlending,
+      opacity: 0.22,
+      blending: THREE.NormalBlending,
     })
     return new THREE.LineSegments(geometry, material)
   }
@@ -160,8 +162,13 @@ export class BiabyssRenderer {
     this.frame += 1
     this.fieldMaterial.uniforms.uTime.value = time
     this.fieldMaterial.uniforms.uSeed.value = this.simulation.seed % 997
-    this.cellRenderer.update(this.simulation, time, alpha)
-    this.nutrientParticles.update(this.simulation, time)
+    const opticalStage = resolveOpticalStage(
+      this.simulation.player.mass,
+      RULE_SET.player.initialMass,
+    )
+    this.fieldMaterial.uniforms.uOpticalStage.value = opticalStage
+    this.cellRenderer.update(this.simulation, time, alpha, opticalStage)
+    this.nutrientParticles.update(this.simulation, time, opticalStage)
     this.internalParticles.update(this.simulation, time, alpha)
 
     if (!this.reducedMotion) {
@@ -226,8 +233,11 @@ export class BiabyssRenderer {
       engine: 'three-webgl',
       canvasCount: this.host.querySelectorAll('canvas').length,
       postProcessing: ['RenderPass', 'UnrealBloomPass', 'OutputPass'],
-      environment: 'procedural-cosmic-fluid',
+      environment: 'procedural-microscope-stages',
       environmentTextures: 0,
+      opticalStage: opticalStageId(
+        resolveOpticalStage(this.simulation.player.mass, RULE_SET.player.initialMass),
+      ),
       worldWidth: this.simulation.worldWidth,
       worldHeight: this.simulation.worldHeight,
       viewportWidth: this.viewportWidth,

@@ -60,11 +60,17 @@ interface CellState {
   mass: number
   life: 'alive' | 'consumed'
   invulnerableUntilTick: number
+  previousGaitPhase: number
+  gaitPhase: number
+  gaitCycle: number
   npcBrain?: NpcBrainState
 }
 ```
 
-`radius`, `speedLimit`, `isThreat`는 저장 필드가 아니라 RuleSet과 현재 상태로 계산하는 파생 값이다.
+`gaitPhase`는 fixed tick에서만 진행되는 `0..1` 보행 위상이며 실제 추진과 Presentation의 이동축·형태 변형이
+함께 읽는다. `previousGaitPhase`는 `previousPosition`과 같은 렌더 보간 경계이고, Renderer는 동일한 alpha로
+위치와 gait를 보간한다. `gaitCycle`은 좌우 꿈틀 방향을 안정적으로 교대하는 정수다. `radius`, `speedLimit`,
+`isThreat`는 저장 필드가 아니라 RuleSet과 현재 상태로 계산하는 파생 값이다.
 
 ### NutrientState
 
@@ -114,6 +120,9 @@ Value Object는 생성 경계에서 유효성을 검사하고 Simulation 내부�
 
 Three.js 객체는 `CellView`, `NutrientView`, `WorldView`처럼 별도 관리한다. `CellView`가 가진 scale·material·particle은
 Simulation field가 아니다. Entity ID로 view를 찾되 view 삭제가 Entity 삭제를 유발하지 않는다.
+
+`OpticalStage`는 Player의 현재 Mass 비율에서 계산하는 `bright-field | algae-bloom | detritus-deep` 표현 값이다.
+배지와 Cell palette를 바꾸지만 Simulation에 저장하지 않고 충돌·흡수·점수에 영향을 주지 않는다.
 
 HUD에는 매 frame 전체 World를 넘기지 않고 다음 저주파 snapshot만 전달한다.
 
