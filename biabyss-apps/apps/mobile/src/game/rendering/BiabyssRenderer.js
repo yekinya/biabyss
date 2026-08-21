@@ -8,6 +8,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { CellRenderer } from './CellRenderer.js'
 import { JoystickRenderer } from './JoystickRenderer.js'
+import {
+  cameraWorldScaleForMass,
+  clampCameraCoordinate,
+  visibleWorldExtent,
+  worldCoordinateFromNormalized,
+} from './cameraScale.js'
 import { opticalStageId, resolveOpticalStage } from './microscopeStage.js'
 import {
   AmbientParticles,
@@ -45,8 +51,10 @@ export class BiabyssRenderer {
 
     this.viewportWidth = 1
     this.viewportHeight = 1
+    this.cameraWorldScale = 1
     this.pixelRatio = 1
     this.frame = 0
+    this.absorptionParticleCursor = 0
     this.drawCalls = 0
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     /** @type {import('./JoystickRenderer.js').JoystickViewState} */
@@ -184,6 +192,7 @@ export class BiabyssRenderer {
       }
     }
     for (const event of events) this.trails.burst(event)
+    this.emitAbsorptionFragments(time)
     this.trails.update(dt)
     this.followPlayer(dt)
     this.composer.render(dt)
@@ -202,19 +211,46 @@ export class BiabyssRenderer {
     this.joystickState.active = false
   }
 
+  /** @param {number} time */
+  emitAbsorptionFragments(time) {
+    const active = this.simulation.activeAbsorptions
+    if (active.length === 0) return
+    const emissionCount = Math.min(
+      RULE_SET.rendering.absorptionParticleEmitsPerFrame,
+      Math.max(2, active.length),
+    )
+    for (let offset = 0; offset < emissionCount; offset += 1) {
+      const activeIndex = (this.absorptionParticleCursor + offset) % active.length
+      const absorption = active[activeIndex]
+      const predator = this.simulation.cellById(absorption.predatorId)
+      const prey = this.simulation.cellById(absorption.preyId)
+      if (!predator || !prey) continue
+      this.trails.emitAbsorption(predator, prey, time * 5.3 + offset * 1.71)
+    }
+    this.absorptionParticleCursor =
+      (this.absorptionParticleCursor + emissionCount) % active.length
+  }
+
   /** @param {number} dt */
   followPlayer(dt) {
-    const halfWidth = this.viewportWidth / 2
-    const halfHeight = this.viewportHeight / 2
-    const targetX = THREE.MathUtils.clamp(
-      this.simulation.player.x,
-      halfWidth,
-      this.simulation.worldWidth - halfWidth,
+    const targetWorldScale = cameraWorldScaleForMass(this.simulation.player.mass)
+    const scaleSmoothing = 1 - Math.exp(-dt * RULE_SET.rendering.cameraScaleSmoothing)
+    this.cameraWorldScale = THREE.MathUtils.lerp(
+      this.cameraWorldScale,
+      targetWorldScale,
+      scaleSmoothing,
     )
-    const targetY = THREE.MathUtils.clamp(
+    this.camera.zoom = 1 / this.cameraWorldScale
+    this.camera.updateProjectionMatrix()
+    const targetX = clampCameraCoordinate(
+      this.simulation.player.x,
+      this.simulation.worldWidth,
+      this.visibleWorldWidth,
+    )
+    const targetY = clampCameraCoordinate(
       this.simulation.player.y,
-      halfHeight,
-      this.simulation.worldHeight - halfHeight,
+      this.simulation.worldHeight,
+      this.visibleWorldHeight,
     )
     const smoothing = 1 - Math.exp(-dt * 5.2)
     this.camera.position.x = THREE.MathUtils.lerp(this.camera.position.x, targetX, smoothing)
@@ -227,9 +263,25 @@ export class BiabyssRenderer {
     const normalizedX = (clientX - bounds.left) / bounds.width - 0.5
     const normalizedY = 0.5 - (clientY - bounds.top) / bounds.height
     return {
-      x: this.camera.position.x + normalizedX * this.viewportWidth,
-      y: this.camera.position.y + normalizedY * this.viewportHeight,
+      x: worldCoordinateFromNormalized(
+        this.camera.position.x,
+        normalizedX,
+        this.visibleWorldWidth,
+      ),
+      y: worldCoordinateFromNormalized(
+        this.camera.position.y,
+        normalizedY,
+        this.visibleWorldHeight,
+      ),
     }
+  }
+
+  get visibleWorldWidth() {
+    return visibleWorldExtent(this.viewportWidth, this.cameraWorldScale)
+  }
+
+  get visibleWorldHeight() {
+    return visibleWorldExtent(this.viewportHeight, this.cameraWorldScale)
   }
 
   diagnostics() {
@@ -252,6 +304,9 @@ export class BiabyssRenderer {
       worldHeight: this.simulation.worldHeight,
       viewportWidth: this.viewportWidth,
       viewportHeight: this.viewportHeight,
+      cameraWorldScale: this.cameraWorldScale,
+      visibleWorldWidth: this.visibleWorldWidth,
+      visibleWorldHeight: this.visibleWorldHeight,
       fieldAreaRatio:
         (this.simulation.worldWidth * this.simulation.worldHeight) /
         (this.simulation.viewportWidth * this.simulation.viewportHeight),

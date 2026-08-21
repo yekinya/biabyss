@@ -20,6 +20,7 @@ describe('NPC aggro profile', () => {
     const player = Object.freeze({ id: 'player', kind: 'player', x: 20, y: 0, mass: 60 })
     const nearNpc = Object.freeze({ id: 'near', kind: 'npc', x: 10, y: 0, mass: 20 })
     const farNpc = Object.freeze({ id: 'far', kind: 'npc', x: 30, y: 0, mass: 10 })
+    const equalNpc = Object.freeze({ id: 'equal', kind: 'npc', x: 5, y: 0, mass: 50 })
 
     expect(
       selectAggroTarget(
@@ -32,7 +33,7 @@ describe('NPC aggro profile', () => {
       selectAggroTarget(
         { aggro: 'pursue-cell', aggroRadius: 100 },
         predator,
-        [player, farNpc, nearNpc],
+        [player, equalNpc, farNpc, nearNpc],
       )?.id,
     ).toBe('near')
   })

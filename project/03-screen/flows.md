@@ -25,9 +25,11 @@
 1. 첫 pointer/touch가 눌린 Canvas CSS 좌표를 조이패드 중심으로 잡는다.
 2. 중심에서 현재 pointer까지의 방향과 반지름 비율을 world target과 `0..1` 강도로 변환한다.
 3. 최신 InputIntent를 다음 simulation tick에서 소비한다.
-4. 작은 Nutrient/Cell 접촉 시 흡수 event와 질량·점수 feedback을 표시한다.
+4. 작은 Nutrient/Cell 접촉 시 흡수 event와 질량·점수 feedback을 표시한다. Cell은 prey Mass가 줄어드는 동안
+   predator 방향으로 조각이 흐르고 predator가 같은 속도로 점진 성장한다.
 5. 큰 Threat가 감지 범위에 들어오면 방향·크기·음향 cue를 한 번 제공한다.
 6. pointer 해제·취소 또는 pause 전까지 고정 tick을 진행한다.
+7. Player가 기준 Mass 이상 성장하면 camera가 부드럽게 zoom out하며 입력 world 변환도 넓어진 화면 범위를 따른다.
 
 ## 4. Pause와 Resume
 

@@ -208,6 +208,8 @@ export class FluidTrails {
     this.buffer = new PointBuffer(RULE_SET.rendering.trailCapacity, pixelRatio)
     this.life = new Float32Array(this.buffer.capacity)
     this.maximumLife = new Float32Array(this.buffer.capacity)
+    this.maximumSize = new Float32Array(this.buffer.capacity)
+    this.maximumAlpha = new Float32Array(this.buffer.capacity)
     this.driftX = new Float32Array(this.buffer.capacity)
     this.driftY = new Float32Array(this.buffer.capacity)
     this.cursor = 0
@@ -231,10 +233,50 @@ export class FluidTrails {
     const lifetime = RULE_SET.rendering.trailLifetimeSeconds * (cell.kind === 'player' ? 1 : 0.72)
     this.life[index] = lifetime
     this.maximumLife[index] = lifetime
+    this.maximumSize[index] = cell.kind === 'player' ? 11 : 7
+    this.maximumAlpha[index] = 0.48
     this.driftX[index] = -directionX * speed * 0.045 - directionY * 3.5
     this.driftY[index] = -directionY * speed * 0.045 + directionX * 3.5
     this.color.setHSL(cell.kind === 'player' ? 0.32 : 0.18, 0.24, 0.27)
     this.buffer.set(index, x, y, 0, cell.kind === 'player' ? 11 : 7, 0.48, this.color)
+  }
+
+  /**
+   * @param {import('../../simulation/Simulation.js').CellState} predator
+   * @param {import('../../simulation/Simulation.js').CellState} prey
+   * @param {number} phase
+   */
+  emitAbsorption(predator, prey, phase) {
+    const dx = predator.x - prey.x
+    const dy = predator.y - prey.y
+    const rawDistance = Math.hypot(dx, dy)
+    const distance = Math.max(0.001, rawDistance)
+    const directionX = rawDistance > 0.001 ? dx / distance : Math.cos(predator.heading)
+    const directionY = rawDistance > 0.001 ? dy / distance : Math.sin(predator.heading)
+    const perpendicularX = -directionY
+    const perpendicularY = directionX
+    const preyRadius = Math.sqrt(prey.mass) * RULE_SET.mass.radiusScale
+    const surfaceOffset = preyRadius * (0.32 + Math.sin(phase * 1.7) * 0.12)
+    const lateralOffset = Math.sin(phase * 3.1 + prey.phase) * preyRadius * 0.34
+    const x = prey.x + directionX * surfaceOffset + perpendicularX * lateralOffset
+    const y = prey.y + directionY * surfaceOffset + perpendicularY * lateralOffset
+    const index = this.cursor
+    this.cursor = (this.cursor + 1) % this.buffer.capacity
+    const lifetime = RULE_SET.rendering.absorptionParticleLifetimeSeconds
+    const speed = Math.min(
+      RULE_SET.rendering.absorptionParticleSpeed,
+      Math.max(42, (distance / lifetime) * 1.08),
+    )
+    const curl = Math.sin(phase * 2.3) * 14
+    const size = Math.min(12, Math.max(3.5, preyRadius * 0.16))
+    this.life[index] = lifetime
+    this.maximumLife[index] = lifetime
+    this.maximumSize[index] = size
+    this.maximumAlpha[index] = 0.76
+    this.driftX[index] = directionX * speed + perpendicularX * curl
+    this.driftY[index] = directionY * speed + perpendicularY * curl
+    this.color.setHSL(0.18 + prey.hue * 0.18, 0.34, 0.32)
+    this.buffer.set(index, x, y, 7, size, 0.76, this.color)
   }
 
   /** @param {number} dt */
@@ -250,8 +292,8 @@ export class FluidTrails {
       const offset = index * 3
       this.buffer.positions[offset] += this.driftX[index] * dt
       this.buffer.positions[offset + 1] += this.driftY[index] * dt
-      this.buffer.sizes[index] = 2 + ratio * 10
-      this.buffer.alphas[index] = ratio * ratio * 0.46
+      this.buffer.sizes[index] = 2 + ratio * Math.max(0, this.maximumSize[index] - 2)
+      this.buffer.alphas[index] = ratio * ratio * this.maximumAlpha[index]
     }
     this.buffer.commit()
   }
@@ -264,6 +306,8 @@ export class FluidTrails {
       const angle = (burstIndex / 14) * Math.PI * 2
       this.life[index] = 0.62
       this.maximumLife[index] = 0.62
+      this.maximumSize[index] = 8
+      this.maximumAlpha[index] = 0.82
       this.driftX[index] = Math.cos(angle) * 42
       this.driftY[index] = Math.sin(angle) * 42
       this.color.setHSL(event.hue < 0.6 ? 0.28 : 0.12, 0.42, 0.3)

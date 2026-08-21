@@ -58,6 +58,8 @@ Player와 8종 NPC를 하나의 instanced cell shader로 그린다. 미립구균
 - 흡수: 외곽 접촉부터 prey 실제 Mass가 겹침 깊이에 비례해 줄고 predator 실제 Mass가 효율만큼 늘어난다.
   prey는 predator 쪽으로 끌려가며 길고 가늘게 줄어들고 predator는 prey 방향으로 미세하게 신장한다. 중심이
   겹쳐도 한 frame에 숨기지 않으며 최소 Mass 도달 순간에만 입자 burst와 respawn/게임오버를 적용한다.
+- 흡수 조각: 전이 전체에서 prey 막·세포질 색을 가진 작은 조각이 prey 표면에서 떨어져 predator 방향으로
+  길게 흐른다. 완료 burst와 구분하며 active absorption이 없으면 방출하지 않는다.
 - 사망: 즉시 사라지지 않고 외곽 붕괴 → 빛 소실 → 입자 분산 순서, 전체 600ms 이하
 - 이동 trail: 진행 반대쪽에서 점액성 point가 방출되고 수명 동안 크기와 alpha가 함께 감소
 

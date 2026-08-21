@@ -125,6 +125,10 @@ interface AbsorptionState {
 감소시키고 효율을 적용한 질량을 predator에 이전한다. prey는 predator 쪽으로 당겨지며 최소 생존 Mass에
 도달하면 NPC prey는 respawn하고 Player prey는 `GAME_OVER`로 전환한다.
 
+접촉 관계는 현재 Mass가 큰 Cell을 predator로 정하고 동일 Mass는 안정 ID로 결정한다. 시작 보호 시간은 Player가
+prey로 선택되는 관계만 무효화한다. Renderer는 active `AbsorptionState`를 읽어 prey에서 predator로 이동하는
+조각 particle을 만들 수 있지만 drain 수치와 완료를 바꾸지 않는다.
+
 ## 4. Value Object
 
 - `EntityId`: Run ID와 증가 sequence로 생성하는 안정 식별자
@@ -154,6 +158,9 @@ Simulation field가 아니다. Entity ID로 view를 찾되 view 삭제가 Entity
 
 `OpticalStage`는 Player의 현재 Mass 비율에서 계산하는 `bright-field | algae-bloom | detritus-deep` 표현 값이다.
 배지와 Cell palette를 바꾸지만 Simulation에 저장하지 않고 충돌·흡수·점수에 영향을 주지 않는다.
+
+`CameraWorldScale`은 Player Mass에서 계산하는 `1..cameraMaximumWorldScale` Presentation 값이다. Orthographic
+projection, Field 경계 clamp와 screen-to-world 변환이 같은 값을 사용하며 Simulation 위치와 충돌을 바꾸지 않는다.
 
 HUD에는 매 frame 전체 World를 넘기지 않고 다음 저주파 snapshot만 전달한다.
 

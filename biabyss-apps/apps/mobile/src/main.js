@@ -68,7 +68,10 @@ function updatePointer(event) {
     pointerY - activePointer.centerY,
     RULE_SET.player.joystickRadiusCssPx,
   )
-  const targetDistance = Math.max(presentation.viewportWidth, presentation.viewportHeight)
+  const targetDistance = Math.max(
+    presentation.visibleWorldWidth,
+    presentation.visibleWorldHeight,
+  )
   simulation.setInput(
     simulation.player.x + sample.directionX * targetDistance,
     simulation.player.y - sample.directionY * targetDistance,

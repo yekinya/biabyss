@@ -45,6 +45,7 @@ export function selectAggroTarget(archetype, predator, candidates) {
   for (const candidate of candidates) {
     if (candidate.id === predator.id || candidate.absorbedBy) continue
     if (archetype.aggro === 'pursue-player' && candidate.kind !== 'player') continue
+    if (candidate.mass >= predator.mass) continue
     if (!canAbsorb(predator.mass, candidate.mass)) continue
     const dx = candidate.x - predator.x
     const dy = candidate.y - predator.y
