@@ -76,7 +76,7 @@ catch에서 뒤쪽 과립이 지연되어 회수된다. 액포는 세포질 안�
 - Stage 3 `detritus-deep`: 회녹 배지, 올리브·갈색 detritus, 짙은 작은 입자와 불규칙 덩어리.
 - 배경은 bitmap을 반복하지 않고 4 octave 이하 noise와 domain warp를 하나의 field shader에서 계산한다.
 - Stage는 Player Mass 성장률에서 연속 보간하는 Presentation 값이며 gameplay 판정에는 사용하지 않는다.
-- Mass 1 Nutrient는 작은 회녹·황록 점으로 2560개를 균일 배치하고 중심이 밝은 짧은 pulse로 유기물임을 표시한다.
+- Mass 1 Nutrient는 작은 회녹·황록 점으로 3200개를 균일 배치하고 중심이 밝은 짧은 pulse로 유기물임을 표시한다.
 
 ## 7. 후처리 예산
 

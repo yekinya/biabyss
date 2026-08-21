@@ -214,7 +214,7 @@ describe('Simulation field', () => {
     )
   })
 
-  it('keeps the eightfold population finite and stable for ten simulated seconds', () => {
+  it('keeps the tenfold population finite and stable for ten simulated seconds', () => {
     const simulation = new Simulation(1000, 600, 0x51a7)
     simulation.start()
     simulation.invulnerableUntil = Number.POSITIVE_INFINITY
@@ -222,8 +222,9 @@ describe('Simulation field', () => {
       simulation.step(1 / RULE_SET.simulationHz)
     }
 
-    expect(simulation.cells).toHaveLength(54 * RULE_SET.world.populationMultiplier + 1)
-    expect(simulation.nutrients).toHaveLength(320 * RULE_SET.world.populationMultiplier)
+    expect(RULE_SET.world.populationMultiplier).toBe(10)
+    expect(simulation.cells).toHaveLength(541)
+    expect(simulation.nutrients).toHaveLength(3200)
     for (const cell of simulation.cells) {
       expect([cell.x, cell.y, cell.vx, cell.vy, cell.mass].every(Number.isFinite)).toBe(true)
     }

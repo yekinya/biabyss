@@ -1,9 +1,9 @@
 // @ts-check
 
-const POPULATION_MULTIPLIER = 8
+const POPULATION_MULTIPLIER = 10
 
 export const RULE_SET = Object.freeze({
-  id: 'microscope-ecology-v2',
+  id: 'microscope-ecology-v3',
   simulationHz: 60,
   maxCatchUpSteps: 5,
   world: Object.freeze({
