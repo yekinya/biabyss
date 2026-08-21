@@ -24,32 +24,32 @@ export class JoystickRenderer {
     this.group.renderOrder = 100
 
     this.backplateMaterial = new THREE.MeshBasicMaterial({
-      color: 0x153f49,
+      color: 0x273b38,
       transparent: true,
-      opacity: 0.13,
+      opacity: 0.18,
       depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide,
     })
     this.ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0x8cfff7,
+      color: 0x304b46,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.58,
       depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide,
     })
     this.strengthMaterial = new THREE.MeshBasicMaterial({
-      color: 0x6ffdf3,
+      color: 0x536c43,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.42,
       depthTest: false,
       depthWrite: false,
       side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
     })
     this.knobMaterial = new THREE.MeshBasicMaterial({
-      color: 0xb8fffb,
+      color: 0x344e47,
       transparent: true,
       opacity: 0.78,
       depthTest: false,
@@ -57,7 +57,7 @@ export class JoystickRenderer {
       side: THREE.DoubleSide,
     })
     this.lineMaterial = new THREE.LineBasicMaterial({
-      color: 0x8cfff7,
+      color: 0x304b46,
       transparent: true,
       opacity: 0.38,
       depthTest: false,

@@ -1,6 +1,7 @@
 // @ts-check
 
 import * as THREE from 'three'
+import { interpolateGaitPhase, sampleGait } from '../../domain/rules/gait.js'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { particleFragmentShader, particleVertexShader } from './shaders/particleShader.js'
 
@@ -23,7 +24,7 @@ class PointBuffer {
       fragmentShader: particleFragmentShader,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
     })
     this.points = new THREE.Points(this.geometry, this.material)
     this.points.frustumCulled = false
@@ -66,14 +67,14 @@ export class AmbientParticles {
     this.buffer = new PointBuffer(RULE_SET.rendering.ambientParticles, pixelRatio)
     const color = new THREE.Color()
     for (let index = 0; index < this.buffer.capacity; index += 1) {
-      color.setHSL(random.between(0.46, 0.58), 0.65, random.between(0.42, 0.72))
+      color.setHSL(random.between(0.14, 0.26), random.between(0.05, 0.28), random.between(0.12, 0.34))
       this.buffer.set(
         index,
         random.between(0, width),
         random.between(0, height),
         -2,
         random.between(1, 4.2),
-        random.between(0.08, 0.32),
+        random.between(0.04, 0.18),
         color,
       )
     }
@@ -99,13 +100,14 @@ export class NutrientParticles {
     scene.add(this.buffer.points)
   }
 
-  /** @param {import('../../simulation/Simulation.js').Simulation} simulation @param {number} time */
-  update(simulation, time) {
+  /** @param {import('../../simulation/Simulation.js').Simulation} simulation @param {number} time @param {number} opticalStage */
+  update(simulation, time, opticalStage) {
     for (let index = 0; index < simulation.nutrients.length; index += 1) {
       const nutrient = simulation.nutrients[index]
       const pulse = 0.82 + Math.sin(time * 2.1 + nutrient.phase) * 0.22
-      this.color.setHSL(nutrient.hue, 0.82, 0.64)
-      this.buffer.set(index, nutrient.x, nutrient.y, 1, 4.4 * pulse, 0.72, this.color)
+      const stageHue = THREE.MathUtils.lerp(0.31, 0.16, opticalStage / 2)
+      this.color.setHSL(stageHue + (nutrient.hue - 0.5) * 0.08, 0.46, 0.24)
+      this.buffer.set(index, nutrient.x, nutrient.y, 1, 4.1 * pulse, 0.62, this.color)
     }
     this.buffer.commit()
   }
@@ -137,37 +139,39 @@ export class InternalParticles {
       const y = THREE.MathUtils.lerp(cell.previousY, cell.y, alpha)
       const radius = Math.sqrt(cell.mass) * RULE_SET.mass.radiusScale
       const speed = Math.hypot(cell.vx, cell.vy)
-      const speedReference = cell.kind === 'player' ? RULE_SET.player.maxSpeed : RULE_SET.npc.maxSpeed
-      const locomotion = Math.min(1, speed / speedReference)
-      const flowRate = 1 + locomotion * 2.2
+      const gait = sampleGait(interpolateGaitPhase(cell.previousGaitPhase, cell.gaitPhase, alpha))
+      const flowRate = 0.35 + gait.drive * 2.6 + gait.rearCatch * 0.8
       const inertiaScale = Math.min(radius * 0.18, speed * 0.045)
       const inertiaX = speed > 0 ? (-cell.vx / speed) * inertiaScale : 0
       const inertiaY = speed > 0 ? (-cell.vy / speed) * inertiaScale : 0
-      this.color.setHSL(cell.kind === 'player' ? 0.49 : cell.hue, 0.78, 0.72)
+      this.color.setRGB(cell.kind === 'player' ? 0.13 : 0.18, cell.kind === 'player' ? 0.18 : 0.2, 0.14)
       for (let localIndex = 0; localIndex < this.perCell; localIndex += 1) {
         const spread =
           0.68 +
           0.3 *
             (0.5 +
-              Math.sin(time * (0.72 + localIndex * 0.031) * flowRate + cell.phase + localIndex) *
+              Math.sin(time * (0.22 + localIndex * 0.012) * flowRate + cell.phase + localIndex) *
                 0.5)
         const angle =
-          time * (0.28 + localIndex * 0.028) * flowRate +
+          time * (0.08 + localIndex * 0.009) * flowRate +
           cell.phase +
           localIndex * 2.17 +
           spread * 0.75
         const orbit = radius * (0.1 + (localIndex % 4) * 0.085) * spread
         const twinkle =
-          0.5 +
-          Math.sin(time * (2.7 + localIndex * 0.17) * (1 + locomotion) + cell.phase * 2 + localIndex) *
-            0.5
+          0.72 + Math.sin(time * 0.38 + cell.phase * 2 + localIndex) * 0.12
+        const axisOffset =
+          (localIndex % 2 === 0 ? 1 : -1) * gait.frontReach * radius * 0.16 +
+          gait.rearCatch * radius * 0.08
+        const headingX = Math.cos(cell.heading)
+        const headingY = Math.sin(cell.heading)
         this.buffer.set(
           particleIndex,
-          x + inertiaX + Math.cos(angle) * orbit,
-          y + inertiaY + Math.sin(angle * 1.13) * orbit * 0.82,
+          x + inertiaX + headingX * axisOffset + Math.cos(angle) * orbit,
+          y + inertiaY + headingY * axisOffset + Math.sin(angle * 1.13) * orbit * 0.82,
           5,
-          (cell.kind === 'player' ? 4.8 : 3.1) * (0.72 + twinkle * 0.48),
-          (cell.kind === 'player' ? 0.7 : 0.44) * (0.55 + twinkle * 0.45),
+          (cell.kind === 'player' ? 3.6 : 2.8) * (0.82 + twinkle * 0.18),
+          (cell.kind === 'player' ? 0.52 : 0.38) * twinkle,
           this.color,
         )
         particleIndex += 1
@@ -216,7 +220,7 @@ export class FluidTrails {
     this.maximumLife[index] = lifetime
     this.driftX[index] = -directionX * speed * 0.045 - directionY * 3.5
     this.driftY[index] = -directionY * speed * 0.045 + directionX * 3.5
-    this.color.setHSL(cell.kind === 'player' ? 0.49 : cell.hue, 0.8, 0.62)
+    this.color.setHSL(cell.kind === 'player' ? 0.32 : 0.18, 0.24, 0.27)
     this.buffer.set(index, x, y, 0, cell.kind === 'player' ? 11 : 7, 0.48, this.color)
   }
 
@@ -249,7 +253,7 @@ export class FluidTrails {
       this.maximumLife[index] = 0.62
       this.driftX[index] = Math.cos(angle) * 42
       this.driftY[index] = Math.sin(angle) * 42
-      this.color.setHSL(event.hue, 0.88, 0.7)
+      this.color.setHSL(event.hue < 0.6 ? 0.28 : 0.12, 0.42, 0.3)
       this.buffer.set(index, event.x, event.y, 7, 8, 0.82, this.color)
     }
   }

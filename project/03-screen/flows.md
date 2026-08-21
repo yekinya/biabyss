@@ -12,7 +12,7 @@
 
 ## 2. 시작
 
-1. 사용자가 `심연으로 들어가기`를 선택한다.
+1. 사용자가 `표본 관찰 시작`을 선택한다.
 2. Run seed와 RuleSet snapshot을 만든다.
 3. World, Player, Nutrient와 안전 거리 밖 NPC를 생성한다.
 4. 시작 보호 시간을 적용한다.
@@ -50,7 +50,7 @@ Resume:
 1. Player 흡수 판정이 나면 Simulation을 즉시 `GAME_OVER`로 고정한다.
 2. 600ms 이하의 사망 표현을 재생한다.
 3. final Mass, Score, duration, absorbed count와 최고 기록 여부를 표시한다.
-4. `다시 잠수하기`와 `타이틀로` 행동을 제공한다.
+4. `새 표본 배양`과 `타이틀로` 행동을 제공한다.
 5. 재시작은 기존 GPU/view resource를 정리하고 새 Run seed로 World를 만든다.
 
 ## 6. 설정

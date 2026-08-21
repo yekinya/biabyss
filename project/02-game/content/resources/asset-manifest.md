@@ -5,16 +5,19 @@
 | assetId | kind | 예정 위치 | 상태 | fallback | 연결 SPEC |
 |---|---|---|---|---|---|
 | `shader.world.fog.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | REJECTED | 단색 radial gradient | SPEC-BIABYSS-20260820-three-microscope-world |
-| `shader.world.cosmic-fluid.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | DRAFT | 저채도 2-layer noise | SPEC-BIABYSS-20260820-soft-cell-locomotion |
+| `shader.world.cosmic-fluid.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | REJECTED | 저채도 2-layer noise | SPEC-BIABYSS-20260820-soft-cell-locomotion |
+| `shader.world.microscope-stages.v3` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/fieldShader.js` | DRAFT | 회백 단색 배지 | SPEC-BIABYSS-20260821-microscope-gait-stages |
 | `shader.cell.membrane.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | TECH_QA | `MeshBasicMaterial` 원형 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.cell.cytoplasm.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | TECH_QA | 반투명 gradient | SPEC-BIABYSS-20260820-three-microscope-world |
-| `shader.cell.soft-locomotion.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 속도 기반 단순 타원 scale | SPEC-BIABYSS-20260820-soft-cell-locomotion |
+| `shader.cell.soft-locomotion.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | REJECTED | 속도 기반 단순 타원 scale | SPEC-BIABYSS-20260820-soft-cell-locomotion |
+| `shader.cell.microscope-organelles.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 회백 타원 + 이중 rim | SPEC-BIABYSS-20260821-microscope-gait-stages |
 | `material.ui.joystick.v1` | procedural material | `biabyss-apps/apps/mobile/src/game/rendering/JoystickRenderer.js` | DRAFT | 입력은 유지하고 표시만 생략 | SPEC-BIABYSS-20260820-soft-cell-locomotion |
 | `shader.particle.fluid.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/particleShader.js` | TECH_QA | 원형 `PointsMaterial` | SPEC-BIABYSS-20260820-three-microscope-world |
 | `shader.post.bloom.v1` | post-process | Three.js `UnrealBloomPass` | TECH_QA | emissive aura 없음 | SPEC-BIABYSS-20260820-three-microscope-world |
-| `material.cell.player.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | cyan 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
-| `material.cell.prey.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | green 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
-| `material.cell.threat.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | TECH_QA | magenta 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
+| `material.cell.player.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | REJECTED | cyan 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
+| `material.cell.prey.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | REJECTED | green 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
+| `material.cell.threat.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | REJECTED | magenta 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
+| `material.cell.microscope-staged.v2` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | DRAFT | 회백 cell + 진한 rim | SPEC-BIABYSS-20260821-microscope-gait-stages |
 | `image.field.microscope.v1` | image | `biabyss-apps/apps/mobile/src/assets/images/microscope-field-v1.png` | REJECTED | procedural shader 배경 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `font.ui.mono.v1` | font | `biabyss-apps/apps/mobile/public/assets/fonts/` | PLANNED | system monospace | ui-baseline |
 | `audio.ambience.deep.v1` | audio | `biabyss-apps/apps/mobile/public/assets/audio/` | PLANNED | silence | audio-baseline |

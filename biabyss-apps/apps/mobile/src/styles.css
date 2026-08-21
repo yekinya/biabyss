@@ -1,6 +1,6 @@
 :root {
-  color: #e8feff;
-  background: #01070b;
+  color: #263631;
+  background: #b8bdbb;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -26,7 +26,7 @@ button {
 .app-shell {
   position: relative;
   isolation: isolate;
-  background: #01070b;
+  background: #b8bdbb;
 }
 
 .game-surface,
@@ -45,17 +45,17 @@ button {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(123, 246, 255, 0.018) 1px, transparent 1px) 0 0 / 86px 86px,
-    linear-gradient(rgba(123, 246, 255, 0.012) 1px, transparent 1px) 0 0 / 86px 86px,
-    radial-gradient(circle at center, transparent 38%, rgba(0, 2, 5, 0.22) 72%, rgba(0, 2, 5, 0.82) 125%);
-  mix-blend-mode: screen, screen, normal;
+    linear-gradient(90deg, rgba(50, 68, 62, 0.018) 1px, transparent 1px) 0 0 / 86px 86px,
+    linear-gradient(rgba(50, 68, 62, 0.014) 1px, transparent 1px) 0 0 / 86px 86px,
+    radial-gradient(circle at center, transparent 43%, rgba(42, 51, 47, 0.08) 78%, rgba(31, 39, 36, 0.28) 132%);
+  mix-blend-mode: multiply, multiply, normal;
 }
 
 .optics::before {
   position: absolute;
   inset: 0;
-  opacity: 0.16;
-  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(186, 253, 255, 0.025) 4px);
+  opacity: 0.12;
+  background-image: repeating-linear-gradient(0deg, transparent 0, transparent 3px, rgba(41, 55, 50, 0.04) 4px);
   content: "";
 }
 
@@ -84,9 +84,9 @@ button {
   width: 35px;
   height: 35px;
   place-items: center;
-  border: 1px solid rgba(113, 247, 255, 0.42);
+  border: 1px solid rgba(45, 69, 61, 0.48);
   border-radius: 50%;
-  box-shadow: 0 0 22px rgba(113, 247, 255, 0.14), inset 0 0 14px rgba(113, 247, 255, 0.08);
+  box-shadow: 0 3px 16px rgba(45, 58, 53, 0.12), inset 0 0 12px rgba(243, 247, 240, 0.3);
 }
 
 .specimen-mark::before,
@@ -95,8 +95,8 @@ button {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #9afffb;
-  box-shadow: 0 0 9px #5cf6ff;
+  background: #3e5a50;
+  box-shadow: 0 0 6px rgba(62, 90, 80, 0.35);
   content: "";
 }
 
@@ -111,7 +111,7 @@ button {
 .specimen-mark i {
   width: 18px;
   height: 1px;
-  background: rgba(113, 247, 255, 0.28);
+  background: rgba(45, 69, 61, 0.38);
   transform: rotate(-34deg);
 }
 
@@ -128,24 +128,24 @@ button {
 
 .brand-block small {
   margin-top: 5px;
-  color: rgba(169, 218, 221, 0.46);
+  color: rgba(39, 57, 51, 0.56);
   font: 8px/1.2 "SFMono-Regular", Consolas, monospace;
 }
 
 .hud {
   display: flex;
   overflow: hidden;
-  border: 1px solid rgba(144, 226, 230, 0.14);
+  border: 1px solid rgba(40, 59, 53, 0.24);
   border-radius: 2px;
-  background: rgba(1, 11, 15, 0.54);
-  box-shadow: 0 14px 45px rgba(0, 0, 0, 0.18);
+  background: rgba(37, 52, 47, 0.72);
+  box-shadow: 0 12px 32px rgba(31, 42, 38, 0.14);
   backdrop-filter: blur(18px);
 }
 
 .hud div {
   min-width: 88px;
   padding: 10px 14px 11px;
-  border-left: 1px solid rgba(144, 226, 230, 0.1);
+  border-left: 1px solid rgba(224, 232, 224, 0.14);
 }
 
 .hud div:first-child {
@@ -160,13 +160,13 @@ button {
 
 .hud span {
   margin-bottom: 4px;
-  color: rgba(167, 216, 220, 0.42);
+  color: rgba(219, 229, 219, 0.58);
   font-size: 7px;
   letter-spacing: 0.18em;
 }
 
 .hud strong {
-  color: rgba(220, 255, 255, 0.94);
+  color: rgba(243, 247, 239, 0.94);
   font-size: 13px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
@@ -185,24 +185,24 @@ button {
   display: flex;
   justify-content: space-between;
   margin-bottom: 7px;
-  color: rgba(177, 225, 226, 0.36);
+  color: rgba(36, 54, 48, 0.56);
   font: 7px/1 "SFMono-Regular", Consolas, monospace;
   letter-spacing: 0.1em;
 }
 
 .field-map__label b {
-  color: rgba(148, 245, 244, 0.62);
+  color: rgba(43, 70, 59, 0.8);
   font-weight: 400;
 }
 
 .field-map__track {
   position: relative;
   height: 43px;
-  border: 1px solid rgba(136, 229, 230, 0.15);
+  border: 1px solid rgba(42, 64, 56, 0.25);
   background:
-    linear-gradient(90deg, transparent 49.5%, rgba(126, 233, 234, 0.08) 50%, transparent 50.5%),
-    linear-gradient(transparent 49%, rgba(126, 233, 234, 0.08) 50%, transparent 51%),
-    rgba(2, 14, 18, 0.34);
+    linear-gradient(90deg, transparent 49.5%, rgba(45, 67, 59, 0.12) 50%, transparent 50.5%),
+    linear-gradient(transparent 49%, rgba(45, 67, 59, 0.12) 50%, transparent 51%),
+    rgba(224, 229, 220, 0.42);
 }
 
 .field-map__track i {
@@ -211,9 +211,9 @@ button {
   left: 50%;
   width: 5px;
   height: 5px;
-  border: 1px solid #8afff9;
+  border: 1px solid #36584c;
   border-radius: 50%;
-  box-shadow: 0 0 8px #69f9ff;
+  box-shadow: 0 0 6px rgba(54, 88, 76, 0.4);
   transform: translate(-50%, -50%);
   transition: left 120ms linear, top 120ms linear;
 }
@@ -235,11 +235,13 @@ button {
 .start-panel::before {
   position: absolute;
   z-index: -1;
-  width: min(660px, 92vw);
-  height: 380px;
-  border-radius: 50%;
-  background: rgba(0, 6, 9, 0.62);
-  filter: blur(54px);
+  width: min(680px, 94vw);
+  height: 370px;
+  border: 1px solid rgba(45, 64, 57, 0.16);
+  border-radius: 28px;
+  background: rgba(224, 228, 219, 0.58);
+  box-shadow: 0 26px 70px rgba(37, 48, 44, 0.14), inset 0 0 50px rgba(249, 250, 243, 0.32);
+  backdrop-filter: blur(9px) saturate(0.72);
   content: "";
 }
 
@@ -254,7 +256,7 @@ button {
   margin: 0 0 20px;
   align-items: center;
   gap: 9px;
-  color: rgba(128, 242, 239, 0.68);
+  color: rgba(47, 73, 62, 0.74);
   font: 9px/1 "SFMono-Regular", Consolas, monospace;
   letter-spacing: 0.24em;
 }
@@ -262,23 +264,22 @@ button {
 .eyebrow span {
   width: 20px;
   height: 1px;
-  background: #72efe9;
-  box-shadow: 0 0 8px #72efe9;
+  background: #526e62;
 }
 
 .start-panel h1 {
   margin: 0;
-  color: rgba(233, 255, 255, 0.97);
+  color: rgba(34, 49, 44, 0.96);
   font-size: clamp(38px, 7.1vw, 94px);
   font-weight: 300;
   letter-spacing: -0.07em;
   line-height: 0.84;
-  text-shadow: 0 0 50px rgba(89, 245, 240, 0.14);
+  text-shadow: 0 2px 18px rgba(244, 248, 239, 0.6);
 }
 
 .start-panel h1 em {
   color: transparent;
-  background: linear-gradient(90deg, #95fff7 5%, #d9ffff 50%, #9db5ff 96%);
+  background: linear-gradient(90deg, #38554a 5%, #6a7653 52%, #445d55 96%);
   background-clip: text;
   font-style: normal;
   font-weight: 520;
@@ -286,7 +287,7 @@ button {
 
 .start-panel > p:not(.eyebrow) {
   margin: 29px 0 27px;
-  color: rgba(185, 217, 218, 0.55);
+  color: rgba(42, 57, 52, 0.7);
   font-size: 13px;
   line-height: 1.8;
 }
@@ -297,11 +298,11 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 6px 7px 6px 20px;
-  border: 1px solid rgba(117, 244, 241, 0.46);
+  border: 1px solid rgba(52, 79, 68, 0.48);
   border-radius: 999px;
-  color: #dcffff;
-  background: rgba(12, 72, 74, 0.3);
-  box-shadow: inset 0 0 22px rgba(103, 255, 248, 0.07), 0 0 34px rgba(67, 244, 238, 0.08);
+  color: #eef2e9;
+  background: rgba(45, 70, 60, 0.78);
+  box-shadow: inset 0 0 18px rgba(239, 245, 232, 0.08), 0 8px 24px rgba(43, 58, 52, 0.13);
   cursor: pointer;
   font-size: 12px;
   letter-spacing: 0.08em;
@@ -314,25 +315,25 @@ button {
   height: 33px;
   place-items: center;
   border-radius: 50%;
-  color: #062225;
-  background: #a5fcf6;
+  color: #e9eee5;
+  background: #607765;
   font-style: normal;
 }
 
 .start-panel button:hover {
-  border-color: rgba(152, 255, 250, 0.9);
-  background: rgba(20, 107, 108, 0.42);
+  border-color: rgba(48, 75, 63, 0.9);
+  background: rgba(40, 65, 54, 0.9);
   transform: translateY(-2px);
 }
 
 .start-panel button:focus-visible {
-  outline: 2px solid #8afff9;
+  outline: 2px solid #405f52;
   outline-offset: 4px;
 }
 
 .start-panel small {
   margin-top: 14px;
-  color: rgba(178, 215, 216, 0.3);
+  color: rgba(43, 59, 53, 0.46);
   font: 8px/1 "SFMono-Regular", Consolas, monospace;
   letter-spacing: 0.12em;
 }
@@ -347,7 +348,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: clamp(20px, 3vw, 42px);
-  color: rgba(166, 215, 216, 0.36);
+  color: rgba(37, 55, 49, 0.52);
   font: 8px/1 "SFMono-Regular", Consolas, monospace;
   letter-spacing: 0.12em;
   pointer-events: none;
@@ -367,14 +368,14 @@ button {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #7ffff5;
-  box-shadow: 0 0 9px #6ffcf5;
+  background: #52715f;
+  box-shadow: 0 0 7px rgba(82, 113, 95, 0.45);
   animation: signal 1.7s ease-in-out infinite;
 }
 
 .status-light.is-alert {
-  background: #ff70b6;
-  box-shadow: 0 0 10px #ff579f;
+  background: #8a4b3e;
+  box-shadow: 0 0 8px rgba(138, 75, 62, 0.46);
 }
 
 .scale {
@@ -384,9 +385,9 @@ button {
 .scale i {
   width: 56px;
   height: 5px;
-  border-right: 1px solid rgba(190, 237, 237, 0.45);
-  border-bottom: 1px solid rgba(190, 237, 237, 0.45);
-  border-left: 1px solid rgba(190, 237, 237, 0.45);
+  border-right: 1px solid rgba(45, 64, 57, 0.5);
+  border-bottom: 1px solid rgba(45, 64, 57, 0.5);
+  border-left: 1px solid rgba(45, 64, 57, 0.5);
 }
 
 .sr-only {

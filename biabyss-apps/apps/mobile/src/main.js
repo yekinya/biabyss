@@ -152,9 +152,9 @@ function syncPanel() {
   statusLight.classList.toggle('is-alert', phase === 'game-over')
 
   if (phase === 'idle') {
-    panelTitle.innerHTML = 'ENTER THE<br /><em>MICROBIAL DEEP</em>'
-    panelCopy.innerHTML = '점액성 심연을 헤엄치며 더 작은 생명체를 흡수하세요.<br />빛이 짙을수록 더 거대한 포식자입니다.'
-    startButtonLabel.textContent = '표본에 접속'
+    panelTitle.innerHTML = 'ENTER THE<br /><em>LIVING FIELD</em>'
+    panelCopy.innerHTML = '현미경 배양액 속에서 한 발씩 수축하며 작은 생명체를 흡수하세요.<br />크기와 진한 윤곽으로 포식자를 구별할 수 있습니다.'
+    startButtonLabel.textContent = '표본 관찰 시작'
     statusCopy.textContent = 'SPECIMEN STABLE'
   } else if (phase === 'paused') {
     panelTitle.innerHTML = 'SPECIMEN<br /><em>SUSPENDED</em>'

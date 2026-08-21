@@ -16,13 +16,20 @@ interface RuleSet {
   player: {
     initialMass: number
     startProtectionMs: number
-    acceleration: number
-    dragPerSecond: number
     maxSpeed: number
-    wriggleAmplitude: number
-    wriggleFrequency: number
-    strideMinimum: number
+    gaitFrequency: number
+    burstAcceleration: number
+    reachBrakePerSecond: number
+    driveBrakePerSecond: number
+    catchBrakePerSecond: number
+    restBrakePerSecond: number
+    lateralBurst: number
     joystickRadiusCssPx: number
+  }
+  gait: {
+    reachEnd: number
+    driveEnd: number
+    catchEnd: number
   }
   mass: {
     radiusScale: number
@@ -33,11 +40,18 @@ interface RuleSet {
   }
   npc: {
     count: number
-    decisionIntervalTicks: number
     awarenessRadius: number
-    wanderAcceleration: number
-    pursueAcceleration: number
-    fleeAcceleration: number
+    gaitFrequency: number
+    burstAcceleration: number
+    reachBrakePerSecond: number
+    driveBrakePerSecond: number
+    catchBrakePerSecond: number
+    restBrakePerSecond: number
+    lateralBurst: number
+    maxSpeed: number
+    massMin: number
+    massMax: number
+    safeSpawnDistance: number
   }
   nutrient: {
     targetCount: number
@@ -56,15 +70,30 @@ interface RuleSet {
 | `player.startProtectionMs` | 6000 |
 | `world.viewportSpanMultiplier` | 6 |
 | `world.viewportAreaMultiplier` | 36 |
-| `player.wriggleAmplitude` | 25 |
-| `player.wriggleFrequency` | 2.4 Hz |
-| `player.strideMinimum` | 0.22 |
+| `player.gaitFrequency` | 1.65 Hz |
+| `player.burstAcceleration` | 2200 |
+| `player.reachBrakePerSecond` | 22 |
+| `player.driveBrakePerSecond` | 1.4 |
+| `player.catchBrakePerSecond` | 24 |
+| `player.restBrakePerSecond` | 32 |
+| `player.lateralBurst` | 145 |
 | `player.joystickRadiusCssPx` | 72 |
+| `gait.reachEnd` | 0.22 |
+| `gait.driveEnd` | 0.46 |
+| `gait.catchEnd` | 0.78 |
 | `mass.radiusScale` | 4 |
 | `mass.cellAbsorbRatio` | 1.12 |
 | `mass.nutrientEfficiency` | 1.0 |
 | `mass.cellEfficiency` | 0.28 |
 | `npc.count` | 54 |
+| `npc.gaitFrequency` | 1.12 Hz |
+| `npc.burstAcceleration` | 720 |
+| `npc.reachBrakePerSecond` | 15 |
+| `npc.driveBrakePerSecond` | 1.8 |
+| `npc.catchBrakePerSecond` | 18 |
+| `npc.restBrakePerSecond` | 22 |
+| `npc.lateralBurst` | 52 |
+| `npc.maxSpeed` | 108 |
 | `nutrient.targetCount` | 320 |
 
 ## 2. 질량과 반경
@@ -86,21 +115,32 @@ radius(mass) = sqrt(mass) × radiusScale
 방향과 함께 목표 world 좌표로 전달한다. 포인터가 반지름 밖으로 나가도 방향은 유지하고 강도만 1로 제한한다.
 
 ```text
+phase = fract(previousPhase + gaitFrequency × (0.65 + 0.35 × inputStrength) × dt)
+frontReach = sineEase(phase, 0, reachEnd) 이후 catchEnd까지 회수
+drive = sinePulse(phase, reachEnd, driveEnd)
+rearCatch = sineEase(phase, driveEnd, catchEnd)
+brake = phase 구간별 reach/drive/catch/rest brakePerSecond
+
 desired = normalize(target - position)
 massFactor = sqrt(initialMass / currentMass)
-side = perpendicular(desired) × sin(elapsed × wriggleFrequency + phase)
-stride = strideMinimum + (1 - strideMinimum) × (0.5 + 0.5 × sin(elapsed × wriggleFrequency + phase))
-acceleration = (desired × playerAcceleration × stride + side × wriggleAmplitude) × inputStrength × massFactor
+sideSign = gaitCycle이 짝수면 1, 홀수면 -1
+acceleration = (desired × burstAcceleration + perpendicular(desired) × lateralBurst × sideSign)
+             × drive × inputStrength × massFactor
+velocity = velocity × exp(-brake × dt) + acceleration × dt
 speedLimit = maxSpeed × (0.35 + 0.65 × inputStrength) × massFactor
-velocity = clampMagnitude((velocity + acceleration × dt) × drag, speedLimit)
+velocity = clampMagnitude(velocity, speedLimit)
 position = position + velocity × dt
 ```
 
 - 목표까지의 거리가 dead zone 안이면 추가 가속하지 않는다.
-- `stride`는 한 주기 안에서 앞부분이 뻗고 뒤가 따라붙는 간헐 추진을 만든다. 렌더러는 같은 주기의
-  늘어남·복원을 표현할 수 있지만 충돌 반경과 이동 결과를 바꾸지 않는다.
+- reach에서는 앞 이동축이 뻗는 동안 강하게 감속해 몸체가 거의 정지한다.
+- drive의 사인 펄스에서만 실제 급가속과 좌우 꿈틀이 발생한다.
+- catch에서는 뒤 이동축이 회수되는 동안 속도를 빠르게 줄이고, rest에서는 다음 발걸음 전 정지를 만든다.
+- `gaitPhase`와 `gaitCycle`은 Simulation state다. Renderer는 같은 gait sample을 읽어 앞축·뒤축·막·내부
+  과립을 표현하며, 위치와 같은 alpha로 `previousGaitPhase → gaitPhase`를 보간한다. 별도 render clock으로
+  보행 위상을 다시 만들지 않는다.
 - 조이패드 강도는 한 번의 추진에서 이동하는 거리와 속도 상한에 함께 반영한다.
-- wriggle은 등속 직선 이동을 깨는 횡가속이며 seed로 정한 phase를 사용한다.
+- 횡방향 꿈틀은 `gaitCycle`의 홀짝으로 방향을 바꾸며 drive 추진과 같은 펄스에서만 적용한다.
 - touch와 mouse는 같은 `InputIntent`로 정규화한다.
 - 첫 active pointer만 조이패드를 소유한다. `pointerup`, `pointercancel`, blur와 visibility change에서 즉시 해제한다.
 - 화면 밖 pointer는 가장 가까운 world 경계 좌표로 clamp한다.
@@ -157,7 +197,7 @@ Player가 흡수되면 즉시 `PlayerConsumed`와 `RunEnded`를 만들고 이후
 
 ## 7. NPC 판단
 
-NPC는 매 frame이 아니라 `decisionIntervalTicks`마다 mode를 선택한다.
+NPC는 고정 timestep에서 주변 상태로 mode를 선택하고, 선택한 방향은 Player와 같은 보행형 추진기에 전달한다.
 
 - `flee`: 감지 범위 안에 자신을 흡수할 수 있는 Cell이 있음
 - `pursue`: 감지 범위 안에 자신이 흡수할 수 있는 가장 가치 높은 Cell이 있음
@@ -183,7 +223,7 @@ NPC가 Player만 인식하는 임시 구현은 prototype으로 표시한다. 최
 
 1. phase와 입력 sequence 확인
 2. NPC decision 갱신
-3. Player/NPC acceleration 계산
+3. Player/NPC gait phase 갱신과 구간별 acceleration 계산
 4. velocity와 position 적분
 5. world 경계 보정
 6. spatial index 재구성 또는 갱신
