@@ -73,7 +73,7 @@ project/
 | `canvas-hardrules.md` | Canvas 좌표·루프·렌더링·성능 절대 규칙 |
 | `app-distribution.md` | Capacitor, 서명, 스테이징과 스토어 승격 |
 | `agent-rules.md` | 분석·설계·구현·Git·PR·병합 절차 |
-| `test-strategy.md` | 정적·단위·결정성·브라우저·기기 검증 게이트 |
+| `test-strategy.md` | 정적·단위·결정성·네이티브 기기 검증 게이트 |
 | `06-specs/*` | 변경 단위 요구사항, 영향, 작업과 수용 기준 |
 | `07-releases/*` | 배포된 버전의 변경·증거·배포·rollback 기록 |
 
