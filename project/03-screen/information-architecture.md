@@ -47,6 +47,7 @@ ambient field
 nutrients
 cells
 gameplay effects
+Canvas joystick
 HUD
 modal scrim
 overlay panel
@@ -54,6 +55,9 @@ accessibility focus proxy
 ```
 
 게임 객체 z-order와 충돌 우선순위를 연결하지 않는다.
+
+조이패드는 gameplay 중 active pointer가 있을 때만 Canvas에 표시하는 입력 피드백이다. DOM HUD 또는 별도
+Canvas로 복제하지 않는다.
 
 ## 5. 반응형과 safe area
 

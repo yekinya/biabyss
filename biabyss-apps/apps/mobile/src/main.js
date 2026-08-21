@@ -2,6 +2,7 @@
 
 import { RULE_SET } from './domain/rules/ruleSet.js'
 import { BiabyssRenderer } from './game/rendering/BiabyssRenderer.js'
+import { sampleJoystick } from './input/joystick.js'
 import { Simulation } from './simulation/Simulation.js'
 import './styles.css'
 
@@ -44,6 +45,8 @@ let accumulator = 0
 let animationFrame = 0
 let hudClock = 0
 let previousPhase = simulation.phase
+/** @type {{pointerId: number, centerX: number, centerY: number} | null} */
+let activePointer = null
 
 function resize() {
   const bounds = host.getBoundingClientRect()
@@ -56,15 +59,63 @@ resize()
 
 /** @param {PointerEvent} event */
 function updatePointer(event) {
-  if (simulation.phase !== 'running') return
-  const target = presentation.screenToWorld(event.clientX, event.clientY)
-  simulation.setInput(target.x, target.y, true)
+  if (simulation.phase !== 'running' || activePointer?.pointerId !== event.pointerId) return
+  const bounds = presentation.renderer.domElement.getBoundingClientRect()
+  const pointerX = event.clientX - bounds.left
+  const pointerY = event.clientY - bounds.top
+  const sample = sampleJoystick(
+    pointerX - activePointer.centerX,
+    pointerY - activePointer.centerY,
+    RULE_SET.player.joystickRadiusCssPx,
+  )
+  const targetDistance = Math.max(presentation.viewportWidth, presentation.viewportHeight)
+  simulation.setInput(
+    simulation.player.x + sample.directionX * targetDistance,
+    simulation.player.y - sample.directionY * targetDistance,
+    true,
+    sample.strength,
+  )
+  presentation.setJoystick({
+    active: true,
+    centerX: activePointer.centerX,
+    centerY: activePointer.centerY,
+    knobX: sample.knobX,
+    knobY: sample.knobY,
+    strength: sample.strength,
+  })
 }
 
-presentation.renderer.domElement.addEventListener('pointerdown', updatePointer)
+/** @param {PointerEvent} event */
+function beginPointer(event) {
+  if (simulation.phase !== 'running' || activePointer || event.button !== 0) return
+  const bounds = presentation.renderer.domElement.getBoundingClientRect()
+  activePointer = {
+    pointerId: event.pointerId,
+    centerX: event.clientX - bounds.left,
+    centerY: event.clientY - bounds.top,
+  }
+  presentation.renderer.domElement.setPointerCapture(event.pointerId)
+  updatePointer(event)
+}
+
+/** @param {number} [pointerId] */
+function releasePointer(pointerId) {
+  if (!activePointer || (pointerId !== undefined && activePointer.pointerId !== pointerId)) return
+  const capturedPointerId = activePointer.pointerId
+  activePointer = null
+  simulation.releaseInput()
+  presentation.hideJoystick()
+  if (presentation.renderer.domElement.hasPointerCapture(capturedPointerId)) {
+    presentation.renderer.domElement.releasePointerCapture(capturedPointerId)
+  }
+}
+
+presentation.renderer.domElement.addEventListener('pointerdown', beginPointer)
 presentation.renderer.domElement.addEventListener('pointermove', updatePointer)
-presentation.renderer.domElement.addEventListener('pointercancel', () => simulation.releaseInput())
-presentation.renderer.domElement.addEventListener('pointerleave', () => simulation.releaseInput())
+presentation.renderer.domElement.addEventListener('pointerup', (event) => releasePointer(event.pointerId))
+presentation.renderer.domElement.addEventListener('pointercancel', (event) => releasePointer(event.pointerId))
+presentation.renderer.domElement.addEventListener('lostpointercapture', (event) => releasePointer(event.pointerId))
+window.addEventListener('blur', () => releasePointer())
 
 function activatePrimaryAction() {
   if (simulation.phase === 'paused') simulation.togglePause()
@@ -78,11 +129,15 @@ window.addEventListener('keydown', (event) => {
   if (event.code !== 'Space') return
   event.preventDefault()
   if (simulation.phase === 'idle' || simulation.phase === 'game-over') simulation.start()
-  else simulation.togglePause()
+  else {
+    releasePointer()
+    simulation.togglePause()
+  }
   syncPanel()
 })
 
 document.addEventListener('visibilitychange', () => {
+  releasePointer()
   if (document.hidden && simulation.phase === 'running') {
     simulation.togglePause()
     accumulator = 0
@@ -156,6 +211,7 @@ function frame(now) {
   }
   if (previousPhase !== simulation.phase) {
     previousPhase = simulation.phase
+    if (simulation.phase !== 'running') releasePointer()
     syncPanel()
   }
   animationFrame = requestAnimationFrame(frame)

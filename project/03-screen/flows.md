@@ -22,11 +22,12 @@
 
 ## 3. 플레이
 
-1. pointer/touch 위치를 Canvas CSS 좌표에서 world 좌표로 변환한다.
-2. 최신 InputIntent를 다음 simulation tick에서 소비한다.
-3. 작은 Nutrient/Cell 접촉 시 흡수 event와 질량·점수 feedback을 표시한다.
-4. 큰 Threat가 감지 범위에 들어오면 방향·크기·음향 cue를 한 번 제공한다.
-5. pause 또는 app background 전까지 고정 tick을 진행한다.
+1. 첫 pointer/touch가 눌린 Canvas CSS 좌표를 조이패드 중심으로 잡는다.
+2. 중심에서 현재 pointer까지의 방향과 반지름 비율을 world target과 `0..1` 강도로 변환한다.
+3. 최신 InputIntent를 다음 simulation tick에서 소비한다.
+4. 작은 Nutrient/Cell 접촉 시 흡수 event와 질량·점수 feedback을 표시한다.
+5. 큰 Threat가 감지 범위에 들어오면 방향·크기·음향 cue를 한 번 제공한다.
+6. pointer 해제·취소 또는 pause 전까지 고정 tick을 진행한다.
 
 ## 4. Pause와 Resume
 

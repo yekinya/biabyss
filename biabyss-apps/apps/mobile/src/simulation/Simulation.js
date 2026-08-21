@@ -59,7 +59,7 @@ export class Simulation {
     this.worldWidth = this.viewportWidth * RULE_SET.world.viewportSpanMultiplier
     this.worldHeight = this.viewportHeight * RULE_SET.world.viewportSpanMultiplier
     this.invulnerableUntil = RULE_SET.player.startProtectionMs / 1000
-    this.input = { x: this.worldWidth / 2, y: this.worldHeight / 2, active: false }
+    this.input = { x: this.worldWidth / 2, y: this.worldHeight / 2, strength: 0, active: false }
     /** @type {SimulationEvent[]} */
     this.events = []
     /** @type {CellState[]} */
@@ -183,7 +183,7 @@ export class Simulation {
     this.invulnerableUntil = RULE_SET.player.startProtectionMs / 1000
     this.events.length = 0
     this.player = this.createPlayer()
-    this.input = { x: this.player.x, y: this.player.y, active: false }
+    this.input = { x: this.player.x, y: this.player.y, strength: 0, active: false }
     this.buildField()
   }
 
@@ -192,15 +192,17 @@ export class Simulation {
     else if (this.phase === 'paused') this.phase = 'running'
   }
 
-  /** @param {number} x @param {number} y @param {boolean} active */
-  setInput(x, y, active) {
+  /** @param {number} x @param {number} y @param {boolean} active @param {number} [strength] */
+  setInput(x, y, active, strength = 1) {
     this.input.x = this.clamp(x, 0, this.worldWidth)
     this.input.y = this.clamp(y, 0, this.worldHeight)
+    this.input.strength = Number.isFinite(strength) ? this.clamp(strength, 0, 1) : 0
     this.input.active = active
   }
 
   releaseInput() {
     this.input.active = false
+    this.input.strength = 0
   }
 
   /** @param {number} dtSeconds */
@@ -236,13 +238,23 @@ export class Simulation {
       const directionX = dx / distance
       const directionY = dy / distance
       const massFactor = Math.sqrt(RULE_SET.player.initialMass / player.mass)
-      const wriggle = Math.sin(this.elapsed * RULE_SET.player.wriggleFrequency * TAU + player.phase)
+      const strideWave = Math.sin(
+        this.elapsed * RULE_SET.player.wriggleFrequency * TAU + player.phase,
+      )
+      const stride =
+        RULE_SET.player.strideMinimum +
+        (1 - RULE_SET.player.strideMinimum) * (0.5 + strideWave * 0.5)
+      const inputStrength = this.input.strength
       player.vx +=
-        (directionX * RULE_SET.player.acceleration - directionY * wriggle * RULE_SET.player.wriggleAmplitude) *
+        (directionX * RULE_SET.player.acceleration * stride -
+          directionY * strideWave * RULE_SET.player.wriggleAmplitude) *
+        inputStrength *
         massFactor *
         dt
       player.vy +=
-        (directionY * RULE_SET.player.acceleration + directionX * wriggle * RULE_SET.player.wriggleAmplitude) *
+        (directionY * RULE_SET.player.acceleration * stride +
+          directionX * strideWave * RULE_SET.player.wriggleAmplitude) *
+        inputStrength *
         massFactor *
         dt
     }
@@ -250,7 +262,13 @@ export class Simulation {
     const drag = RULE_SET.player.dragPerSecond ** dt
     player.vx *= drag
     player.vy *= drag
-    this.limitVelocity(player, RULE_SET.player.maxSpeed * Math.sqrt(RULE_SET.player.initialMass / player.mass))
+    const inputSpeedFactor = this.input.active ? 0.35 + this.input.strength * 0.65 : 1
+    this.limitVelocity(
+      player,
+      RULE_SET.player.maxSpeed *
+        inputSpeedFactor *
+        Math.sqrt(RULE_SET.player.initialMass / player.mass),
+    )
     this.integrate(player, dt)
   }
 

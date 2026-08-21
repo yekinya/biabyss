@@ -17,6 +17,9 @@ export const cellFragmentShader = /* glsl */ `
   uniform float uPhase;
   uniform float uMorph;
   uniform float uThreat;
+  uniform float uLocomotion;
+  uniform float uStride;
+  uniform float uRearFollow;
   uniform vec3 uColor;
 
   float hash21(vec2 p) {
@@ -68,39 +71,67 @@ export const cellFragmentShader = /* glsl */ `
   void main() {
     vec2 p = (vUv - 0.5) * 2.0;
     float t = uTime * 0.52 + uPhase;
-    float fieldNoise = noise(p * 3.1 + vec2(t * 0.17, -t * 0.13));
+    float frontMask = smoothstep(-0.32, 0.62, p.x);
+    float frontStretch = 1.0 + uLocomotion * uStride * 0.16;
+    float rearStretch = 1.0 + uLocomotion * uRearFollow * 0.09;
+    float localStretch = mix(rearStretch, frontStretch, frontMask);
+    vec2 softP = vec2(
+      (p.x - uLocomotion * (uStride - uRearFollow) * 0.035) / localStretch,
+      p.y * (1.0 + uLocomotion * 0.025)
+    );
+    float fieldNoise = noise(softP * 3.1 + vec2(t * 0.17, -t * 0.13));
     float membraneWave =
-      sin(atan(p.y, p.x) * 5.0 + t * 2.2) * 0.024 +
-      sin(atan(p.y, p.x) * 8.0 - t * 1.45) * 0.012 +
-      (fieldNoise - 0.5) * 0.035;
-    float distanceToMembrane = shapeDistance(p) + membraneWave - 0.72;
-    float body = 1.0 - smoothstep(-0.015, 0.025, distanceToMembrane);
-    float rim = 1.0 - smoothstep(0.018, 0.105, abs(distanceToMembrane));
+      sin(atan(softP.y, softP.x) * 5.0 + t * 2.2) * 0.021 +
+      sin(atan(softP.y, softP.x) * 8.0 - t * 1.45) * 0.01 +
+      (fieldNoise - 0.5) * 0.03;
+    float distanceToMembrane = shapeDistance(softP) + membraneWave - 0.72;
+    float body = 1.0 - smoothstep(-0.025, 0.035, distanceToMembrane);
+    float rim = 1.0 - smoothstep(0.012, 0.058, abs(distanceToMembrane));
     float inner = 1.0 - smoothstep(-0.36, -0.04, distanceToMembrane);
 
     vec2 drift = vec2(sin(t * 0.7), cos(t * 0.58)) * 0.055;
-    vec2 organelleP = p + drift;
+    drift.x -= uLocomotion * (0.035 + uStride * 0.045);
+    vec2 organelleP = softP + drift;
     float nucleoidLine = abs(organelleP.y - sin(organelleP.x * 7.0 + t) * 0.12);
     float nucleoid = (1.0 - smoothstep(0.018, 0.075, nucleoidLine)) *
       (1.0 - smoothstep(0.15, 0.58, abs(organelleP.x))) * inner;
 
-    vec2 granuleGrid = floor((p + 0.8) * 8.0);
-    vec2 granuleCell = fract((p + 0.8) * 8.0) - 0.5;
-    float granuleSeed = hash21(granuleGrid + floor(uPhase * 11.0));
-    float granules = (1.0 - smoothstep(0.09, 0.23, length(granuleCell))) *
-      step(0.73, granuleSeed) * inner;
+    float coreSpread = mix(0.10, 0.31, uLocomotion * (0.34 + uStride * 0.66));
+    float coreBreathA = 0.92 + sin(t * 3.8 + uPhase) * 0.08;
+    float coreBreathB = 0.92 + sin(t * 4.3 + uPhase + 2.1) * 0.08;
+    float coreA = (1.0 - smoothstep(0.055, 0.145, length(organelleP - vec2(coreSpread, 0.018)))) *
+      coreBreathA;
+    float coreB = (1.0 - smoothstep(0.052, 0.135, length(organelleP + vec2(coreSpread, 0.018)))) *
+      coreBreathB;
+    float luminousCores = (coreA + coreB) * inner;
 
-    float caustic = noise(p * 5.5 - vec2(t * 0.14, t * 0.09));
-    float specular = pow(max(0.0, 1.0 - length(p - vec2(-0.2, 0.23)) * 1.35), 8.0);
+    float internalRate = 1.0 + uLocomotion * 2.25;
+    float gather = 0.84 + sin(t * 1.18 * internalRate + uPhase) * 0.1;
+    vec2 galaxyP = organelleP / gather;
+    float galaxyRadius = length(galaxyP);
+    float galaxyAngle = atan(galaxyP.y, galaxyP.x);
+    galaxyAngle += galaxyRadius * 2.6 - t * (0.34 + uLocomotion * 0.72);
+    galaxyP = mat2(cos(galaxyAngle), -sin(galaxyAngle), sin(galaxyAngle), cos(galaxyAngle)) * galaxyP;
+    vec2 granuleGrid = floor((galaxyP + 0.8) * 9.0);
+    vec2 granuleCell = fract((galaxyP + 0.8) * 9.0) - 0.5;
+    float granuleSeed = hash21(granuleGrid + floor(uPhase * 11.0));
+    float twinkle = 0.28 +
+      0.72 * (0.5 + 0.5 * sin(t * 6.4 * (1.0 + uLocomotion) + granuleSeed * 18.0));
+    float granules = (1.0 - smoothstep(0.09, 0.23, length(granuleCell))) *
+      step(0.68, granuleSeed) * inner * twinkle;
+
+    float caustic = noise(softP * 5.5 - vec2(t * 0.14, t * 0.09));
+    float specular = pow(max(0.0, 1.0 - length(softP - vec2(-0.2, 0.23)) * 1.35), 8.0);
     vec3 deepColor = mix(uColor * 0.055, uColor * 0.34, caustic);
     vec3 color = deepColor * body;
-    color += uColor * rim * (1.38 + uThreat * 0.52);
-    color += mix(uColor, vec3(0.88, 1.0, 1.0), 0.68) * nucleoid * 1.22;
-    color += vec3(0.84, 1.0, 0.97) * granules * 0.92;
-    color += vec3(0.84, 1.0, 1.0) * specular * body * 0.76;
-    color += uColor * (1.0 - smoothstep(0.0, 0.82, length(p))) * 0.15;
+    color += uColor * rim * (0.56 + uThreat * 0.26);
+    color += mix(uColor, vec3(0.88, 1.0, 1.0), 0.68) * nucleoid * 0.72;
+    color += mix(uColor, vec3(0.94, 1.0, 1.0), 0.82) * luminousCores * 1.72;
+    color += vec3(0.84, 1.0, 0.97) * granules * 1.85;
+    color += vec3(0.84, 1.0, 1.0) * specular * body * 0.48;
+    color += uColor * (1.0 - smoothstep(0.0, 0.82, length(softP))) * 0.18;
 
-    float alpha = body * (0.64 + rim * 0.34);
+    float alpha = body * (0.67 + rim * 0.2);
     if (alpha < 0.015) discard;
     gl_FragColor = vec4(color, alpha);
   }
