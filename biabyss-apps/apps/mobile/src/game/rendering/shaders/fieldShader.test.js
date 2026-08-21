@@ -14,4 +14,15 @@ describe('procedural microscope field shader', () => {
     expect(fieldFragmentShader).toContain('octave < 4')
     expect(fieldFragmentShader).toContain('warp * 1.22')
   })
+
+  it('layers a microscope bath, colonies and debris from the first stage', () => {
+    expect(fieldFragmentShader).toContain('opticalBlue')
+    expect(fieldFragmentShader).toContain('cultureCluster')
+    expect(fieldFragmentShader).toContain('colonyBody')
+    expect(fieldFragmentShader).toContain('colonyEdge')
+    expect(fieldFragmentShader).toContain('detritusCluster')
+    expect(fieldFragmentShader).toContain('defocusDebris')
+    expect(fieldFragmentShader).toContain('greenColony')
+    expect(fieldFragmentShader).toContain('ochreColony')
+  })
 })

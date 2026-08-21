@@ -70,6 +70,8 @@ renderer.render(simulation.snapshot(accumulator / stepMs))
 - Simulation Entity가 생성되면 view factory가 ID에 맞는 view를 얻는다.
 - 소비된 Entity는 frame 끝에 view pool로 반환한다.
 - texture, material, geometry를 Entity마다 새로 만들지 않고 공유한다.
+- InstancedMesh의 per-instance 상태는 `vec4` packing을 우선하고, 기본 geometry attribute와 `instanceMatrix`를
+  포함한 활성 vertex attribute가 WebGL 최소 보장치 8개를 넘지 않게 설계한다.
 - scene 종료 시 animation loop, DOM listener, audio voice와 GPU resource를 모두 해제한다.
 - restart와 scene 재생성에서도 Canvas와 listener가 중복되지 않아야 한다.
 
@@ -87,6 +89,8 @@ renderer.render(simulation.snapshot(accumulator / stepMs))
 - 자산은 안정 `assetId`로 Registry에서 해석한다. component가 경로 문자열을 조립하지 않는다.
 - preload 필수/지연 가능/scene 전용 자산을 manifest에서 구분한다.
 - load 실패는 fallback을 사용하고 화면에 recoverable 오류를 표시한다.
+- Cell shader compile/link 실패 또는 기기 attribute 예산 부족은 gameplay을 중단하지 않고 외막·세포질만 가진
+  단순 procedural material로 전환하며 diagnostics에 fallback 상태를 남긴다.
 
 ## 8. 오류 처리
 

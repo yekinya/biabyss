@@ -12,7 +12,7 @@
 
 | 역할 | 기준 색 | 보조 신호 |
 |---|---|---|
-| Stage 1 배지 | 회백 `#B8BDBB` | 옅은 청회 광학 얼룩 |
+| Stage 1 배지 | 청회백 `#91A9AB` | 황록·황토 colony와 흐릿한 갈색 잔해 |
 | Stage 2 배지 | 청록회 `#789CA0` | 황록·황토 응집물 |
 | Stage 3 배지 | 회녹 `#9AA092` | 올리브·갈색 detritus |
 | Player | 반투명 회백·연녹 | 진한 이중 rim, 일정한 쌍축 |
@@ -27,7 +27,7 @@
 뒤에서 앞으로:
 
 1. phase halo: 막 바깥의 매우 얇은 밝고 어두운 광학 이중선
-2. membrane shadow: 짙은 회색·갈색 외곽
+2. membrane shadow: 모든 Stage 배지보다 명확히 어두운 회색·갈색 외막과 안쪽의 가는 두 번째 막
 3. cytoplasm: 배지보다 약간 밝거나 어두운 반투명 회백 면
 4. vacuole: 투명한 중심과 어두운 가는 테두리의 불규칙 원
 5. movement axes: 진행축 위의 두 짙은 내부 중심
@@ -75,10 +75,12 @@ catch에서 뒤쪽 과립이 지연되어 회수된다. 액포는 세포질 안�
 
 ## 6. 배경
 
-- Stage 1 `bright-field`: 밝은 회백 배지, 옅은 청회 얼룩, 낮은 밀도의 투명 기포.
+- Stage 1 `bright-field`: 청회색 배양액, 화면 일부를 차지하는 황록·황토 colony, 흐릿한 갈색 잔해와 투명 기포.
 - Stage 2 `algae-bloom`: 청록회 배지, 황록·황토 응집물, 중간 밀도의 부유 과립.
 - Stage 3 `detritus-deep`: 회녹 배지, 올리브·갈색 detritus, 짙은 작은 입자와 불규칙 덩어리.
 - 배경은 bitmap을 반복하지 않고 4 octave 이하 noise와 domain warp를 하나의 field shader에서 계산한다.
+- Stage 1도 단색에 가까운 빈 회색 면으로 두지 않는다. 한 viewport에서 bath, 큰 colony, 미세 detritus와
+  defocus debris가 서로 다른 scale로 동시에 보이되 Cell보다 낮은 국소 대비를 유지한다.
 - Stage는 Player Mass 성장률에서 연속 보간하는 Presentation 값이며 gameplay 판정에는 사용하지 않는다.
 - Mass 1~6 Nutrient는 회녹·황록 점으로 9600개를 균일 배치한다. 기존 최소 크기보다 point 기본 크기를 키우고
   Mass의 제곱근에 따라 서로 다른 크기로 그리며 중심이 밝은 짧은 pulse로 유기물임을 표시한다.
