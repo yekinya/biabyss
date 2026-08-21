@@ -44,6 +44,10 @@ interface RuleSet {
     absorptionMinimumContactFactor: number
     absorptionMinimumMass: number
     absorptionPullPerSecond: number
+    contactRadiusMultiplier: number
+    movementMassExponent: number
+    movementMinimumFactor: number
+    movementMaximumFactor: number
   }
   npc: {
     count: number
@@ -63,6 +67,15 @@ interface RuleSet {
     collisionRadiusScale: number
     pointSizeBase: number
     pointSizeMassScale: number
+  }
+  rendering: {
+    absorptionParticleEmitsPerFrame: number
+    absorptionParticleLifetimeSeconds: number
+    absorptionParticleSpeed: number
+    cameraZoomOutStartMass: number
+    cameraZoomOutFullMass: number
+    cameraMaximumWorldScale: number
+    cameraScaleSmoothing: number
   }
 }
 
@@ -95,7 +108,7 @@ interface NpcArchetype {
 
 | 값 | 기준 |
 |---|---:|
-| `id` | `microscope-ecology-v4` |
+| `id` | `microscope-ecology-v5` |
 | `simulationHz` | 60 |
 | `player.initialMass` | 36 |
 | `player.startProtectionMs` | 6000 |
@@ -115,13 +128,18 @@ interface NpcArchetype {
 | `gait.catchTimeScale` | 0.5 |
 | `gait.movementSpeedMultiplier` | 2 |
 | `mass.radiusScale` | 4 |
-| `mass.cellAbsorbRatio` | 1.12 |
+| `mass.cellAbsorbRatio` | 1.0 |
 | `mass.nutrientEfficiency` | 1.0 |
 | `mass.cellEfficiency` | 0.28 |
-| `mass.absorptionDamageFractionPerSecond` | 1.15 |
-| `mass.absorptionMinimumContactFactor` | 0.12 |
+| `mass.maximum` | 4096 |
+| `mass.absorptionDamageFractionPerSecond` | 0.38 |
+| `mass.absorptionMinimumContactFactor` | 0.16 |
 | `mass.absorptionMinimumMass` | 0.05 |
-| `mass.absorptionPullPerSecond` | 11 |
+| `mass.absorptionPullPerSecond` | 2.6 |
+| `mass.contactRadiusMultiplier` | 1.06 |
+| `mass.movementMassExponent` | 0.18 |
+| `mass.movementMinimumFactor` | 0.58 |
+| `mass.movementMaximumFactor` | 1.3 |
 | `world.populationMultiplier` | 30 |
 | `npc.count` | 1620 |
 | `npc.reachBrakePerSecond` | 15 |
@@ -178,7 +196,11 @@ rearCatch = sineEase(phase, driveEnd, catchEnd)
 brake = phase 구간별 reach/drive/catch/rest brakePerSecond
 
 desired = normalize(target - position)
-massFactor = sqrt(initialMass / currentMass)
+massFactor = clamp(
+  pow(referenceMass / currentMass, movementMassExponent),
+  movementMinimumFactor,
+  movementMaximumFactor
+)
 sideSign = gaitCycle이 짝수면 1, 홀수면 -1
 acceleration = (desired × burstAcceleration + perpendicular(desired) × lateralBurst × sideSign)
              × drive × inputStrength × massFactor
@@ -244,12 +266,13 @@ Nutrient는 한 번만 소비되고 SpawnSystem이 목표 밀도를 회복한다
 
 ## 6. Cell 흡수
 
-Cell A가 Cell B를 흡수하려면 모두 참이어야 한다. 접촉은 중심 진입 threshold가 아니라 두 물리 반경의 외곽이
-처음 닿는 순간부터 시작한다.
+Cell A와 Cell B가 접촉하면 현재 Mass가 큰 쪽이 작은 쪽을 흡수한다. 동일 Mass는 더 작은 안정 Entity ID를
+predator로 선택한다. 시작 보호 중에는 Player가 prey인 관계만 무효화한다. 접촉은 중심 진입 threshold가 아니라
+두 물리 반경의 민감한 외곽이 처음 닿는 순간부터 시작한다.
 
 ```text
 A.mass >= B.mass × cellAbsorbRatio
-distance(A, B) <= radius(A) + radius(B)
+distance(A, B) <= (radius(A) + radius(B)) × contactRadiusMultiplier
 A와 B가 alive
 ```
 
@@ -263,7 +286,10 @@ totalGainedMass = (startPreyMass - absorptionMinimumMass) × cellEfficiency
 fixed tick의 현재 Mass·반경·거리에서 다시 계산한다.
 
 ```text
-overlapDepth = max(0, radius(predator) + radius(prey) - distance)
+overlapDepth = max(
+  0,
+  (radius(predator) + radius(prey)) × contactRadiusMultiplier - distance
+)
 overlapRatio = clamp(overlapDepth / (2 × radius(prey)), 0, 1)
 contactFactor = max(absorptionMinimumContactFactor, overlapRatio)
 damageDelta = min(
@@ -281,13 +307,14 @@ progress = 1 - prey.mass / startPreyMass
 - Mass 비율은 전이 시작 tick에 판정하며 이후 Mass drain이 선점을 뒤집지 않는다.
 - 미세 접촉은 minimum contact factor로 천천히 drain되고, 깊이 겹칠수록 drain 속도가 연속적으로 증가한다.
 - prey와 predator의 실제 Mass는 첫 drain tick부터 함께 변하며 중심이 겹쳐도 한 tick에 완료하지 않는다.
+- active absorption 동안 Presentation은 prey 막에서 predator 방향으로 작은 조각 particle을 연속 방출한다.
 - 완료 시 NPC prey는 안전 위치에 respawn하고 `CellAbsorbed`를 만든다.
 - Player prey는 완료 시 `PlayerConsumed`와 `RunEnded`를 만들고 `GAME_OVER`로 전환한다.
 
 ## 7. NPC 판단
 
-NPC의 어그로 프로필과 감지 거리는 Species RuleSet에서 고정한다. 공격 후보는 감지 반경과
-`cellAbsorbRatio`를 모두 만족해야 한다.
+NPC의 어그로 프로필과 감지 거리는 Species RuleSet에서 고정한다. 공격 후보는 감지 반경 안에 있고 공격자보다
+현재 Mass가 엄격히 작은 Cell만 허용한다. 동일 Mass tie-break는 실제 접촉 판정에만 적용한다.
 
 - `pursue-player`: Player가 반경 안에 있고 자신이 Player를 흡수할 수 있을 때만 Player를 추적한다.
 - `pursue-cell`: Player와 NPC 중 반경 안에 있고 자신이 흡수할 수 있는 가장 가까운 Cell을 추적한다.
@@ -332,7 +359,7 @@ NPC의 어그로 프로필과 감지 거리는 Species RuleSet에서 고정한�
 4. velocity·position 적분과 world 경계 보정
 5. 진행 중 Absorption pull·질량 이전·완료 처리
 6. 이동 뒤 cell spatial hash 재구성
-7. Nutrient 충돌 후보 수집·안정 정렬·흡수
+7. Nutrient 충돌 후보 수집·안정 정렬·흡수. 증가한 현재 Mass Radius는 이후 Cell 접촉에 즉시 사용한다.
 8. 모든 Cell 쌍의 외곽 접촉 후보를 안정 ID 순서로 처리하고 Absorption 시작
 9. spawn queue 적용
 10. Mass·유한값·Entity 불변 조건 검사
@@ -341,7 +368,28 @@ NPC의 어그로 프로필과 감지 거리는 Species RuleSet에서 고정한�
 
 Renderer callback, Three.js object 순서와 post-process 결과는 이 순서에 개입하지 않는다.
 
-## 10. 점수
+## 10. Camera world scale
+
+Player가 `cameraZoomOutStartMass`를 넘으면 Orthographic camera가 더 넓은 Field를 보인다.
+
+```text
+massProgress = clamp(
+  (sqrt(playerMass) - sqrt(cameraZoomOutStartMass)) /
+  (sqrt(cameraZoomOutFullMass) - sqrt(cameraZoomOutStartMass)),
+  0,
+  1
+)
+cameraWorldScale = lerp(1, cameraMaximumWorldScale, smoothstep(massProgress))
+visibleWorldWidth = canvasCssWidth × cameraWorldScale
+visibleWorldHeight = canvasCssHeight × cameraWorldScale
+```
+
+- 기준값은 `startMass=144`, `fullMass=2304`, `maximumWorldScale=2.25`다.
+- scale은 render delta로 부드럽게 보간하지만 목표 계산은 Player Mass만 읽는다.
+- camera 중심 clamp와 screen-to-world는 현재 visible world extent를 함께 사용한다.
+- camera scale은 Simulation 충돌·이동·입력 강도를 바꾸지 않는다.
+
+## 11. 점수
 
 MVP 점수는 설명 가능한 정수 조합을 사용한다.
 
@@ -354,7 +402,7 @@ score = floor(absorbedNutrientMass × 10)
 UI 애니메이션 값과 권위 score를 분리한다. game over에는 final score, mass, duration, absorbed count와
 death cause를 고정한다.
 
-## 11. Pause와 앱 생명주기
+## 12. Pause와 앱 생명주기
 
 - `visibilitychange`, Capacitor app state inactive, audio interruption에서 `PAUSED`로 전환한다.
 - resume 시 이전 frame timestamp와 accumulator를 폐기한다.

@@ -3,7 +3,7 @@
 const POPULATION_MULTIPLIER = 30
 
 export const RULE_SET = Object.freeze({
-  id: 'microscope-ecology-v4',
+  id: 'microscope-ecology-v5',
   simulationHz: 60,
   maxCatchUpSteps: 5,
   world: Object.freeze({
@@ -34,14 +34,18 @@ export const RULE_SET = Object.freeze({
   }),
   mass: Object.freeze({
     radiusScale: 4,
-    cellAbsorbRatio: 1.12,
+    cellAbsorbRatio: 1,
     nutrientEfficiency: 1,
     cellEfficiency: 0.28,
-    maximum: 520,
-    absorptionDamageFractionPerSecond: 1.15,
-    absorptionMinimumContactFactor: 0.12,
+    maximum: 4096,
+    absorptionDamageFractionPerSecond: 0.38,
+    absorptionMinimumContactFactor: 0.16,
     absorptionMinimumMass: 0.05,
-    absorptionPullPerSecond: 11,
+    absorptionPullPerSecond: 2.6,
+    contactRadiusMultiplier: 1.06,
+    movementMassExponent: 0.18,
+    movementMinimumFactor: 0.58,
+    movementMaximumFactor: 1.3,
   }),
   npc: Object.freeze({
     count: 54 * POPULATION_MULTIPLIER,
@@ -187,8 +191,15 @@ export const RULE_SET = Object.freeze({
     dprMaximum: 1.5,
     ambientParticles: 1800,
     internalParticlesPerCell: 4,
-    trailCapacity: 640,
+    trailCapacity: 1200,
     trailLifetimeSeconds: 1.75,
     cellPlaneOverscan: 1.35,
+    absorptionParticleEmitsPerFrame: 18,
+    absorptionParticleLifetimeSeconds: 0.62,
+    absorptionParticleSpeed: 220,
+    cameraZoomOutStartMass: 144,
+    cameraZoomOutFullMass: 2304,
+    cameraMaximumWorldScale: 2.25,
+    cameraScaleSmoothing: 3.2,
   }),
 })

@@ -20,6 +20,7 @@
 | `shader.particle.nutrient-swarm.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/particleShader.js` | DRAFT | 단색 Point | SPEC-BIABYSS-20260821-npc-ecology-absorption |
 | `material.ui.joystick.v1` | procedural material | `biabyss-apps/apps/mobile/src/game/rendering/JoystickRenderer.js` | DRAFT | 입력은 유지하고 표시만 생략 | SPEC-BIABYSS-20260820-soft-cell-locomotion |
 | `shader.particle.fluid.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/particleShader.js` | TECH_QA | 원형 `PointsMaterial` | SPEC-BIABYSS-20260820-three-microscope-world |
+| `material.particle.absorption-fragments.v2` | material | `biabyss-apps/apps/mobile/src/game/rendering/ParticleSystems.js` | TECH_QA | 완료 순간 단일 burst | SPEC-BIABYSS-20260821-continuous-consumption-camera-scale |
 | `shader.post.bloom.v1` | post-process | Three.js `UnrealBloomPass` | TECH_QA | emissive aura 없음 | SPEC-BIABYSS-20260820-three-microscope-world |
 | `material.cell.player.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | REJECTED | cyan 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |
 | `material.cell.prey.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | REJECTED | green 기본 material | SPEC-BIABYSS-20260820-three-microscope-world |

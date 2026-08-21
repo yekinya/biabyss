@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { RULE_SET } from '../domain/rules/ruleSet.js'
 import { sampleGait } from '../domain/rules/gait.js'
+import { movementFactorForMass } from '../domain/rules/mass.js'
 import { Simulation } from './Simulation.js'
 
 /** @param {Simulation} simulation @param {import('./Simulation.js').CellState[]} retained */
@@ -239,7 +240,12 @@ describe('Simulation field', () => {
     expect(leftLarvoid.x).toBe(rightLarvoid.x)
     expect(leftLarvoid.y).toBe(rightLarvoid.y)
     expect(Math.hypot(leftLarvoid.vx, leftLarvoid.vy)).toBeCloseTo(
-      RULE_SET.npc.archetypes[2].maxSpeed * RULE_SET.gait.movementSpeedMultiplier,
+      RULE_SET.npc.archetypes[2].maxSpeed *
+        RULE_SET.gait.movementSpeedMultiplier *
+        movementFactorForMass(
+          leftLarvoid.mass,
+          (RULE_SET.npc.archetypes[2].massMin + RULE_SET.npc.archetypes[2].massMax) * 0.5,
+        ),
       0,
     )
   })
@@ -316,6 +322,91 @@ describe('Simulation field', () => {
     expect(simulation.events.map((event) => event.type)).toContain('nutrient-absorbed')
     expect(simulation.takeEvents().map((event) => event.type)).toContain('nutrient-absorbed')
     expect(simulation.takeEvents()).toHaveLength(0)
+  })
+
+  it('lets a protected player eat while preventing the player from being eaten', () => {
+    const playerPredator = new Simulation(1000, 600, 707)
+    const small = playerPredator.cells.find((cell) => cell.speciesId === 'micrococcus')
+    if (!small) throw new Error('micrococcus fixture missing')
+    retainCells(playerPredator, [playerPredator.player, small])
+    playerPredator.player.mass = 36
+    small.mass = 10
+    small.x = playerPredator.player.x
+    small.y = playerPredator.player.y
+    playerPredator.cellSpatialIndex.rebuild(playerPredator.cells)
+    playerPredator.resolveCellContacts()
+    expect(small.absorbedBy).toBe(playerPredator.player.id)
+
+    const playerPrey = new Simulation(1000, 600, 707)
+    const large = playerPrey.cells.find((cell) => cell.speciesId === 'tentacle-amoeba')
+    if (!large) throw new Error('tentacle amoeba fixture missing')
+    retainCells(playerPrey, [playerPrey.player, large])
+    large.mass = 80
+    large.x = playerPrey.player.x
+    large.y = playerPrey.player.y
+    playerPrey.cellSpatialIndex.rebuild(playerPrey.cells)
+    playerPrey.resolveCellContacts()
+    expect(playerPrey.activeAbsorptions).toHaveLength(0)
+  })
+
+  it('starts absorption for near-equal and equal mass contacts without a neutral band', () => {
+    const nearEqual = new Simulation(1000, 600, 707)
+    const prey = nearEqual.cells.find((cell) => cell.speciesId === 'micrococcus')
+    if (!prey) throw new Error('micrococcus fixture missing')
+    retainCells(nearEqual, [nearEqual.player, prey])
+    nearEqual.player.mass = 50
+    prey.mass = 49.99
+    prey.x = nearEqual.player.x
+    prey.y = nearEqual.player.y
+    nearEqual.elapsed = nearEqual.invulnerableUntil
+    nearEqual.cellSpatialIndex.rebuild(nearEqual.cells)
+    nearEqual.resolveCellContacts()
+    expect(prey.absorbedBy).toBe(nearEqual.player.id)
+
+    const equal = new Simulation(1000, 600, 707)
+    const equalNpc = equal.cells.find((cell) => cell.speciesId === 'micrococcus')
+    if (!equalNpc) throw new Error('micrococcus fixture missing')
+    retainCells(equal, [equal.player, equalNpc])
+    equal.player.mass = 50
+    equalNpc.mass = 50
+    equalNpc.x = equal.player.x
+    equalNpc.y = equal.player.y
+    equal.elapsed = equal.invulnerableUntil
+    equal.cellSpatialIndex.rebuild(equal.cells)
+    equal.resolveCellContacts()
+    expect(equal.activeAbsorptions).toHaveLength(1)
+    expect(equal.activeAbsorptions[0].predatorId).toBe(
+      [equal.player.id, equalNpc.id].sort()[0],
+    )
+  })
+
+  it('uses the grown current radius and membrane contact margin immediately', () => {
+    const simulation = new Simulation(1000, 600, 707)
+    const prey = simulation.cells.find((cell) => cell.speciesId === 'micrococcus')
+    if (!prey) throw new Error('micrococcus fixture missing')
+    retainCells(simulation, [simulation.player, prey])
+    const nutrient = simulation.nutrients[0]
+    simulation.nutrients = [nutrient]
+    simulation.player.mass = 36
+    nutrient.mass = 108
+    nutrient.x = simulation.player.x
+    nutrient.y = simulation.player.y
+    prey.mass = 10
+    const physicalRadii =
+      Math.sqrt(144) * RULE_SET.mass.radiusScale +
+      Math.sqrt(prey.mass) * RULE_SET.mass.radiusScale
+    prey.x =
+      simulation.player.x +
+      physicalRadii * RULE_SET.mass.contactRadiusMultiplier -
+      0.001
+    prey.y = simulation.player.y
+    simulation.elapsed = simulation.invulnerableUntil
+    simulation.cellSpatialIndex.rebuild(simulation.cells)
+    simulation.consumeNutrients()
+    expect(simulation.player.mass).toBe(144)
+    simulation.resolveCellContacts()
+    expect(simulation.activeAbsorptions).toHaveLength(1)
+    expect(prey.absorbedBy).toBe(simulation.player.id)
   })
 
   it('starts at outer contact and drains mass faster with deeper overlap', () => {
@@ -405,7 +496,12 @@ describe('Simulation field', () => {
     expect(simulation.player.mass).toBeLessThan(previousMass + 10 * RULE_SET.mass.cellEfficiency)
     expect(simulation.absorbed).toBe(0)
 
-    for (let tick = 0; tick < 120 && simulation.activeAbsorptions.length > 0; tick += 1) {
+    for (let tick = 0; tick < 40; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
+    expect(simulation.activeAbsorptions).toHaveLength(1)
+    expect(prey.mass).toBeGreaterThan(RULE_SET.mass.absorptionMinimumMass)
+    expect(simulation.absorbed).toBe(0)
+
+    for (let tick = 0; tick < 360 && simulation.activeAbsorptions.length > 0; tick += 1) {
       simulation.step(1 / RULE_SET.simulationHz)
     }
     expect(simulation.activeAbsorptions).toHaveLength(0)
@@ -435,7 +531,8 @@ describe('Simulation field', () => {
     simulation.step(1 / RULE_SET.simulationHz)
 
     expect(simulation.activeAbsorptions).toHaveLength(1)
-    expect(prey.filter((cell) => cell.absorbedBy === simulation.player.id)).toHaveLength(1)
+    expect(simulation.busyCellIds.size).toBe(2)
+    expect(simulation.cells.filter((cell) => cell.absorbedBy !== undefined)).toHaveLength(1)
   })
 
   it('delays game over until the player suction transition completes', () => {
@@ -455,7 +552,7 @@ describe('Simulation field', () => {
     for (let tick = 0; tick < 20; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
     expect(simulation.phase).toBe('running')
     expect(simulation.player.absorptionProgress).toBeGreaterThan(0)
-    for (let tick = 0; tick < 120 && simulation.phase === 'running'; tick += 1) {
+    for (let tick = 0; tick < 360 && simulation.phase === 'running'; tick += 1) {
       simulation.step(1 / RULE_SET.simulationHz)
     }
     expect(simulation.phase).toBe('game-over')

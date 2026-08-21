@@ -1,6 +1,11 @@
 // @ts-check
 
-import { canAbsorb, radiusForMass } from '../domain/rules/mass.js'
+import {
+  contactDistanceForMasses,
+  movementFactorForMass,
+  predatorPreyForContact,
+  radiusForMass,
+} from '../domain/rules/mass.js'
 import { aggroIntent, selectAggroTarget } from '../domain/rules/npcBehavior.js'
 import { nutrientRadius } from '../domain/rules/nutrient.js'
 import { advanceGait, sampleGait } from '../domain/rules/gait.js'
@@ -329,7 +334,7 @@ export class Simulation {
     if (moving) {
       const directionX = dx / distance
       const directionY = dy / distance
-      const massFactor = Math.sqrt(RULE_SET.player.initialMass / player.mass)
+      const massFactor = movementFactorForMass(player.mass, RULE_SET.player.initialMass)
       const inputStrength = this.input.strength
       player.heading = Math.atan2(directionY, directionX)
       this.advanceCellGait(
@@ -435,12 +440,14 @@ export class Simulation {
       this.advanceCellGait(npc, dt, archetype.gaitFrequency)
 
       if (archetype.locomotion === 'constant' || archetype.locomotion === 'drift') {
+        const referenceMass = (archetype.massMin + archetype.massMax) * 0.5
+        const massFactor = movementFactorForMass(npc.mass, referenceMass)
         const driftPulse =
           archetype.locomotion === 'drift'
             ? 0.72 + Math.sin(this.elapsed + npc.phase) * 0.18
             : 1
         const targetSpeed =
-          archetype.maxSpeed * RULE_SET.gait.movementSpeedMultiplier * driftPulse
+          archetype.maxSpeed * RULE_SET.gait.movementSpeedMultiplier * driftPulse * massFactor
         const velocityBlend =
           1 - Math.exp(-(archetype.locomotion === 'constant' ? 8 : 1.8) * dt)
         npc.vx += (directionX * targetSpeed - npc.vx) * velocityBlend
@@ -454,7 +461,7 @@ export class Simulation {
       const damping = Math.exp(-brake * dt)
       const sideSign = npc.gaitCycle % 2 === 0 ? 1 : -1
       const referenceMass = (archetype.massMin + archetype.massMax) * 0.5
-      const massFactor = Math.sqrt(referenceMass / npc.mass)
+      const massFactor = movementFactorForMass(npc.mass, referenceMass)
       npc.vx =
         npc.vx * damping +
         (directionX * archetype.burstAcceleration -
@@ -497,7 +504,10 @@ export class Simulation {
   }
 
   resolveCellContacts() {
-    const maximumRadius = radiusForMass(RULE_SET.mass.maximum)
+    let maximumRadius = 0
+    for (const cell of this.cells) {
+      maximumRadius = Math.max(maximumRadius, radiusForMass(cell.mass))
+    }
     /** @type {{first: CellState, second: CellState}[]} */
     const contacts = []
 
@@ -507,19 +517,14 @@ export class Simulation {
         this.cellSpatialIndex.query(
           first.x,
           first.y,
-          radiusForMass(first.mass) + maximumRadius,
+          (radiusForMass(first.mass) + maximumRadius) *
+            RULE_SET.mass.contactRadiusMultiplier,
           this.spatialCandidates,
         )
       )
       for (const second of candidates) {
         if (first.id >= second.id || second.absorbedBy || this.isCellBusy(second.id)) continue
-        if (
-          this.elapsed < this.invulnerableUntil &&
-          (first.kind === 'player' || second.kind === 'player')
-        ) {
-          continue
-        }
-        const contactDistance = radiusForMass(first.mass) + radiusForMass(second.mass)
+        const contactDistance = contactDistanceForMasses(first.mass, second.mass)
         if (Math.hypot(second.x - first.x, second.y - first.y) > contactDistance) continue
         contacts.push({ first, second })
       }
@@ -532,8 +537,9 @@ export class Simulation {
 
     for (const { first, second } of contacts) {
       if (this.isCellBusy(first.id) || this.isCellBusy(second.id)) continue
-      if (canAbsorb(first.mass, second.mass)) this.startAbsorption(first, second)
-      else if (canAbsorb(second.mass, first.mass)) this.startAbsorption(second, first)
+      const { predator, prey } = predatorPreyForContact(first, second)
+      if (prey.kind === 'player' && this.elapsed < this.invulnerableUntil) continue
+      this.startAbsorption(predator, prey)
     }
   }
 
@@ -554,7 +560,9 @@ export class Simulation {
       const predatorRadius = radiusForMass(predator.mass)
       const preyRadius = radiusForMass(prey.mass)
       const distance = Math.hypot(predator.x - prey.x, predator.y - prey.y)
-      const overlapDepth = Math.max(0, predatorRadius + preyRadius - distance)
+      const contactDistance =
+        (predatorRadius + preyRadius) * RULE_SET.mass.contactRadiusMultiplier
+      const overlapDepth = Math.max(0, contactDistance - distance)
       const overlapRatio = this.clamp(overlapDepth / Math.max(preyRadius * 2, 0.001), 0, 1)
       const contactFactor = Math.max(
         RULE_SET.mass.absorptionMinimumContactFactor,

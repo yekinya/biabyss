@@ -81,6 +81,8 @@ renderer.render(simulation.snapshot(accumulator / stepMs))
 - HUD snapshot은 값이 달라졌을 때와 최대 10Hz에서만 store로 보낸다.
 - settings 변경은 Application Command를 거쳐 필요한 adapter에 전파한다.
 - 파생 값 radius, threat relation과 score presentation을 중복 저장하지 않는다.
+- Orthographic camera world scale은 projection, Field clamp, pointer의 screen-to-world에서 하나의 Presentation
+  값으로 공유한다. zoom된 Canvas CSS 크기를 world 크기로 오인하지 않는다.
 
 ## 7. 자산
 

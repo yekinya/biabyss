@@ -87,6 +87,8 @@ BOOT → READY → RUNNING ⇄ PAUSED → GAME_OVER
 12. NPC 어그로 성향·표적 범위와 감지 반경은 Species RuleSet에서만 결정한다.
 13. 공격형 NPC는 현재 Mass로 흡수 가능한 작은 Cell만 Aggro Target으로 선택한다.
 14. Cell 흡수 중 prey의 실제 Mass 감소와 predator의 실제 Mass 증가는 같은 fixed tick drain에서 계산한다.
+15. 접촉한 두 Cell은 현재 Mass가 큰 쪽을 predator로 정하며 동일 Mass는 안정 ID로 한쪽을 선택한다.
+16. 시작 보호는 Player가 prey인 흡수만 막고 Player가 작은 Cell을 흡수하는 행동은 막지 않는다.
 
 ## 6. 도메인 경계
 
