@@ -7,7 +7,7 @@
 - 고정 timestep의 로컬 Simulation
 - 앱 셸은 Capacitor iOS·Android
 - 공개 웹 배포 없음
-- GitHub Actions는 PR 품질 게이트, Codemagic은 서명·TestFlight·Google Play 배포 후보
+- PR 품질 게이트는 고정 Node 버전의 로컬 검사, Codemagic은 서명·TestFlight·Google Play 배포 후보
 
 ## 2. 논리 계층
 
