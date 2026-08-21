@@ -58,7 +58,16 @@ interface CellState {
   position: Vec2
   velocity: Vec2
   mass: number
-  speciesId: 'player' | 'micrococcus' | 'ciliophoran' | 'larvoid' | 'tentacle-amoeba' | 'diplococcus'
+  speciesId:
+    | 'player'
+    | 'micrococcus'
+    | 'ciliophoran'
+    | 'larvoid'
+    | 'tentacle-amoeba'
+    | 'diplococcus'
+    | 'streptococcus'
+    | 'spirillum'
+    | 'radiolarian'
   life: 'alive' | 'consumed'
   invulnerableUntilTick: number
   previousGaitPhase: number
@@ -67,7 +76,10 @@ interface CellState {
   absorbedBy?: EntityId
   previousAbsorptionProgress: number
   absorptionProgress: number
-  npcBrain?: NpcBrainState
+  previousFeedingProgress: number
+  feedingProgress: number
+  nextDecisionTick: number
+  targetId?: EntityId
 }
 ```
 
@@ -77,8 +89,11 @@ interface CellState {
 `isThreat`는 저장 필드가 아니라 RuleSet과 현재 상태로 계산하는 파생 값이다.
 
 `speciesId`는 NPC의 형태·기동·어그로 프로필을 RuleSet에서 찾는 안정 ID다. `absorbedBy`가 있으면 해당 Cell은
-자체 이동과 새 충돌 후보에서 제외되고, `absorptionProgress`는 fixed tick에서만 `0..1`로 증가한다.
-`previousAbsorptionProgress`는 위치와 같은 alpha로 빨림 변형을 보간하기 위한 직전 tick 값이다.
+자체 이동과 새 충돌 후보에서 제외된다. `absorptionProgress`는 시작 Mass 대비 실제 Mass 손실 비율이며 fixed
+tick에서만 `0..1`로 증가한다. predator의 `feedingProgress`는 같은 drain에서 계산한 신장 표현 값이다.
+`previousAbsorptionProgress`와 `previousFeedingProgress`는 위치와 같은 alpha로 변형을 보간하기 위한 직전 tick 값이다.
+NPC의 `targetId`는 다음 decision까지 유지하는 표적이고 `nextDecisionTick`은 spatial hash 재탐색 시점을 소유한다.
+행동 mode는 Species Aggro Profile과 현재 표적에서 파생하며 별도 중복 저장하지 않는다.
 
 ### NutrientState
 
@@ -91,16 +106,8 @@ interface NutrientState {
 }
 ```
 
-### NpcBrainState
-
-```ts
-interface NpcBrainState {
-  mode: 'wander' | 'pursue' | 'flee' | 'passive'
-  heading: number
-  nextDecisionTick: number
-  targetId?: EntityId
-}
-```
+`mass`는 RuleSet의 `massMin..massMax` 안에서 Run seed로 생성되고 respawn 때도 같은 범위에서 다시 결정된다.
+충돌 반경과 Point 크기는 이 Mass의 파생 값이다.
 
 ### AbsorptionState
 
@@ -109,14 +116,14 @@ interface AbsorptionState {
   predatorId: EntityId
   preyId: EntityId
   elapsedSeconds: number
-  durationSeconds: number
   startPreyMass: number
   transferredMass: number
 }
 ```
 
-포식 가능 여부와 대상 선점은 시작 tick에 확정한다. 전이 중 prey는 predator 쪽으로 당겨지고 획득 질량은
-진행률 차이만큼 점진 이전된다. 완료 시 NPC prey는 respawn하고 Player prey는 `GAME_OVER`로 전환한다.
+포식 가능 여부와 대상 선점은 외곽 접촉 tick에 확정한다. 전이 중 겹침 깊이로 drain을 계산해 prey 실제 Mass를
+감소시키고 효율을 적용한 질량을 predator에 이전한다. prey는 predator 쪽으로 당겨지며 최소 생존 Mass에
+도달하면 NPC prey는 respawn하고 Player prey는 `GAME_OVER`로 전환한다.
 
 ## 4. Value Object
 

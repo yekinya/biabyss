@@ -68,9 +68,38 @@ export function sampleGait(phase) {
  * @param {number} cyclesPerSecond
  */
 export function advanceGait(phase, dtSeconds, cyclesPerSecond) {
-  const next = phase + dtSeconds * cyclesPerSecond
-  const completedCycles = Math.max(0, Math.floor(next))
-  return { phase: next - completedCycles, completedCycles }
+  let currentPhase = Number.isFinite(phase) ? phase - Math.floor(phase) : 0
+  let remainingSeconds = Math.max(0, dtSeconds)
+  let completedCycles = 0
+
+  while (remainingSeconds > Number.EPSILON) {
+    const inCatch = currentPhase >= RULE_SET.gait.driveEnd && currentPhase < RULE_SET.gait.catchEnd
+    const phaseRate = cyclesPerSecond * (inCatch ? RULE_SET.gait.catchTimeScale : 1)
+    if (phaseRate <= 0) break
+    const segmentEnd =
+      currentPhase < RULE_SET.gait.reachEnd
+        ? RULE_SET.gait.reachEnd
+        : currentPhase < RULE_SET.gait.driveEnd
+          ? RULE_SET.gait.driveEnd
+          : currentPhase < RULE_SET.gait.catchEnd
+            ? RULE_SET.gait.catchEnd
+            : 1
+    const secondsToBoundary = (segmentEnd - currentPhase) / phaseRate
+    if (remainingSeconds < secondsToBoundary - Number.EPSILON) {
+      currentPhase += remainingSeconds * phaseRate
+      remainingSeconds = 0
+      continue
+    }
+
+    currentPhase = segmentEnd
+    remainingSeconds = Math.max(0, remainingSeconds - secondsToBoundary)
+    if (currentPhase >= 1 - Number.EPSILON) {
+      currentPhase = 0
+      completedCycles += 1
+    }
+  }
+
+  return { phase: currentPhase, completedCycles }
 }
 
 /**

@@ -3,6 +3,7 @@
 import * as THREE from 'three'
 import { interpolateGaitPhase, sampleGait } from '../../domain/rules/gait.js'
 import { canAbsorb, radiusForMass } from '../../domain/rules/mass.js'
+import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { cellFragmentShader, cellVertexShader } from './shaders/cellShader.js'
 
 export class CellRenderer {
@@ -19,6 +20,7 @@ export class CellRenderer {
     this.driveAttribute = this.createAttribute(1)
     this.rearCatchAttribute = this.createAttribute(1)
     this.absorptionAttribute = this.createAttribute(1)
+    this.feedingAttribute = this.createAttribute(1)
     this.colorAttribute = this.createAttribute(3)
     this.geometry.setAttribute('aPhase', this.phaseAttribute)
     this.geometry.setAttribute('aMorph', this.morphAttribute)
@@ -28,12 +30,14 @@ export class CellRenderer {
     this.geometry.setAttribute('aDrive', this.driveAttribute)
     this.geometry.setAttribute('aRearCatch', this.rearCatchAttribute)
     this.geometry.setAttribute('aAbsorption', this.absorptionAttribute)
+    this.geometry.setAttribute('aFeeding', this.feedingAttribute)
     this.geometry.setAttribute('aColor', this.colorAttribute)
 
     this.material = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
         uOpticalStage: { value: 0 },
+        uPlaneOverscan: { value: RULE_SET.rendering.cellPlaneOverscan },
       },
       vertexShader: cellVertexShader,
       fragmentShader: cellFragmentShader,
@@ -73,13 +77,21 @@ export class CellRenderer {
         cell.absorptionProgress,
         alpha,
       )
+      const feeding = THREE.MathUtils.lerp(
+        cell.previousFeedingProgress,
+        cell.feedingProgress,
+        alpha,
+      )
       const radius = radiusForMass(cell.mass)
       const gaitStretch = 1 + gait.frontReach * 0.24 - gait.rearCatch * 0.035
       const gaitCompression = 1 - gait.drive * 0.045
       const suctionStretch = 1 + Math.sin(absorption * Math.PI) * 1.4
       const suctionLength = Math.max(0.3, 1 - absorption * 0.7)
       const suctionWidth = Math.max(0.12, 1 - absorption * 0.88)
-      const planeRadius = radius / 0.72
+      const feedingStretch = 1 + feeding * 0.32
+      const feedingCompression = 1 - feeding * 0.08
+      const planeRadius =
+        (radius * RULE_SET.rendering.cellPlaneOverscan) / 0.72
 
       const threat = cell.kind === 'npc' && canAbsorb(cell.mass, simulation.player.mass)
       const prey = cell.kind === 'npc' && canAbsorb(simulation.player.mass, cell.mass)
@@ -91,8 +103,11 @@ export class CellRenderer {
       this.transform.position.set(x, y, 3 + (cell.kind === 'player' ? 0.3 : threat ? 0.15 : 0))
       this.transform.rotation.set(0, 0, cell.heading)
       this.transform.scale.set(
-        planeRadius * gaitStretch * suctionStretch * suctionLength,
-        (planeRadius / Math.sqrt(gaitStretch)) * gaitCompression * suctionWidth,
+        planeRadius * gaitStretch * suctionStretch * suctionLength * feedingStretch,
+        (planeRadius / Math.sqrt(gaitStretch)) *
+          gaitCompression *
+          suctionWidth *
+          feedingCompression,
         1,
       )
       this.transform.updateMatrix()
@@ -105,6 +120,7 @@ export class CellRenderer {
       this.driveAttribute.setX(index, gait.drive)
       this.rearCatchAttribute.setX(index, gait.rearCatch)
       this.absorptionAttribute.setX(index, absorption)
+      this.feedingAttribute.setX(index, feeding)
       this.colorAttribute.setXYZ(index, this.color.r, this.color.g, this.color.b)
     }
 
@@ -119,6 +135,7 @@ export class CellRenderer {
       this.driveAttribute,
       this.rearCatchAttribute,
       this.absorptionAttribute,
+      this.feedingAttribute,
       this.colorAttribute,
     ]) {
       attribute.needsUpdate = true

@@ -1,9 +1,9 @@
 // @ts-check
 
-const POPULATION_MULTIPLIER = 10
+const POPULATION_MULTIPLIER = 30
 
 export const RULE_SET = Object.freeze({
-  id: 'microscope-ecology-v3',
+  id: 'microscope-ecology-v4',
   simulationHz: 60,
   maxCatchUpSteps: 5,
   world: Object.freeze({
@@ -15,6 +15,8 @@ export const RULE_SET = Object.freeze({
     reachEnd: 0.22,
     driveEnd: 0.46,
     catchEnd: 0.78,
+    catchTimeScale: 0.5,
+    movementSpeedMultiplier: 2,
   }),
   player: Object.freeze({
     initialMass: 36,
@@ -33,11 +35,12 @@ export const RULE_SET = Object.freeze({
   mass: Object.freeze({
     radiusScale: 4,
     cellAbsorbRatio: 1.12,
-    contactDepthRatio: 0.74,
     nutrientEfficiency: 1,
     cellEfficiency: 0.28,
     maximum: 520,
-    absorptionDurationSeconds: 0.72,
+    absorptionDamageFractionPerSecond: 1.15,
+    absorptionMinimumContactFactor: 0.12,
+    absorptionMinimumMass: 0.05,
     absorptionPullPerSecond: 11,
   }),
   npc: Object.freeze({
@@ -47,6 +50,8 @@ export const RULE_SET = Object.freeze({
     catchBrakePerSecond: 18,
     restBrakePerSecond: 22,
     safeSpawnDistance: 330,
+    decisionIntervalTicks: 6,
+    spatialCellSize: 256,
     archetypes: Object.freeze([
       Object.freeze({
         id: 'micrococcus',
@@ -67,7 +72,7 @@ export const RULE_SET = Object.freeze({
         id: 'ciliophoran',
         name: '섬모편모충',
         morph: 1,
-        aggro: 'pursue',
+        aggro: 'pursue-player',
         aggroRadius: 390,
         locomotion: 'gait',
         massMin: 28,
@@ -97,7 +102,7 @@ export const RULE_SET = Object.freeze({
         id: 'tentacle-amoeba',
         name: '촉수아메바',
         morph: 3,
-        aggro: 'pursue',
+        aggro: 'pursue-cell',
         aggroRadius: 480,
         locomotion: 'gait',
         massMin: 58,
@@ -123,11 +128,60 @@ export const RULE_SET = Object.freeze({
         maxSpeed: 16,
         turnRate: 0.22,
       }),
+      Object.freeze({
+        id: 'streptococcus',
+        name: '연쇄구균',
+        morph: 5,
+        aggro: 'pursue-cell',
+        aggroRadius: 420,
+        locomotion: 'gait',
+        massMin: 16,
+        massMax: 48,
+        gaitFrequency: 1.4,
+        burstAcceleration: 900,
+        lateralBurst: 55,
+        maxSpeed: 120,
+        turnRate: 1.8,
+      }),
+      Object.freeze({
+        id: 'spirillum',
+        name: '나선편모충',
+        morph: 6,
+        aggro: 'flee',
+        aggroRadius: 340,
+        locomotion: 'gait',
+        massMin: 8,
+        massMax: 30,
+        gaitFrequency: 2,
+        burstAcceleration: 1000,
+        lateralBurst: 70,
+        maxSpeed: 140,
+        turnRate: 2.4,
+      }),
+      Object.freeze({
+        id: 'radiolarian',
+        name: '방산포자충',
+        morph: 7,
+        aggro: 'pursue-cell',
+        aggroRadius: 520,
+        locomotion: 'gait',
+        massMin: 72,
+        massMax: 180,
+        gaitFrequency: 0.85,
+        burstAcceleration: 650,
+        lateralBurst: 30,
+        maxSpeed: 80,
+        turnRate: 0.9,
+      }),
     ]),
   }),
   nutrient: Object.freeze({
     targetCount: 320 * POPULATION_MULTIPLIER,
-    mass: 1,
+    massMin: 1,
+    massMax: 6,
+    collisionRadiusScale: 4.5,
+    pointSizeBase: 5.5,
+    pointSizeMassScale: 2.5,
   }),
   rendering: Object.freeze({
     dprMaximum: 1.5,
@@ -135,5 +189,6 @@ export const RULE_SET = Object.freeze({
     internalParticlesPerCell: 4,
     trailCapacity: 640,
     trailLifetimeSeconds: 1.75,
+    cellPlaneOverscan: 1.35,
   }),
 })

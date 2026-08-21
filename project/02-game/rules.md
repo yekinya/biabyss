@@ -31,6 +31,8 @@ interface RuleSet {
     reachEnd: number
     driveEnd: number
     catchEnd: number
+    catchTimeScale: number
+    movementSpeedMultiplier: number
   }
   mass: {
     radiusScale: number
@@ -38,7 +40,9 @@ interface RuleSet {
     nutrientEfficiency: number
     cellEfficiency: number
     maximum: number
-    absorptionDurationSeconds: number
+    absorptionDamageFractionPerSecond: number
+    absorptionMinimumContactFactor: number
+    absorptionMinimumMass: number
     absorptionPullPerSecond: number
   }
   npc: {
@@ -48,19 +52,33 @@ interface RuleSet {
     catchBrakePerSecond: number
     restBrakePerSecond: number
     safeSpawnDistance: number
+    decisionIntervalTicks: number
+    spatialCellSize: number
     archetypes: NpcArchetype[]
   }
   nutrient: {
     targetCount: number
-    mass: number
+    massMin: number
+    massMax: number
+    collisionRadiusScale: number
+    pointSizeBase: number
+    pointSizeMassScale: number
   }
 }
 
 interface NpcArchetype {
-  id: 'micrococcus' | 'ciliophoran' | 'larvoid' | 'tentacle-amoeba' | 'diplococcus'
+  id:
+    | 'micrococcus'
+    | 'ciliophoran'
+    | 'larvoid'
+    | 'tentacle-amoeba'
+    | 'diplococcus'
+    | 'streptococcus'
+    | 'spirillum'
+    | 'radiolarian'
   name: string
   morph: number
-  aggro: 'pursue' | 'flee' | 'passive'
+  aggro: 'pursue-player' | 'pursue-cell' | 'flee' | 'passive'
   aggroRadius: number
   locomotion: 'gait' | 'constant' | 'drift'
   massMin: number
@@ -77,7 +95,7 @@ interface NpcArchetype {
 
 | 값 | 기준 |
 |---|---:|
-| `id` | `microscope-ecology-v3` |
+| `id` | `microscope-ecology-v4` |
 | `simulationHz` | 60 |
 | `player.initialMass` | 36 |
 | `player.startProtectionMs` | 6000 |
@@ -94,20 +112,29 @@ interface NpcArchetype {
 | `gait.reachEnd` | 0.22 |
 | `gait.driveEnd` | 0.46 |
 | `gait.catchEnd` | 0.78 |
+| `gait.catchTimeScale` | 0.5 |
+| `gait.movementSpeedMultiplier` | 2 |
 | `mass.radiusScale` | 4 |
 | `mass.cellAbsorbRatio` | 1.12 |
 | `mass.nutrientEfficiency` | 1.0 |
 | `mass.cellEfficiency` | 0.28 |
-| `mass.absorptionDurationSeconds` | 0.72 |
+| `mass.absorptionDamageFractionPerSecond` | 1.15 |
+| `mass.absorptionMinimumContactFactor` | 0.12 |
+| `mass.absorptionMinimumMass` | 0.05 |
 | `mass.absorptionPullPerSecond` | 11 |
-| `world.populationMultiplier` | 10 |
-| `npc.count` | 540 |
+| `world.populationMultiplier` | 30 |
+| `npc.count` | 1620 |
 | `npc.reachBrakePerSecond` | 15 |
 | `npc.driveBrakePerSecond` | 1.8 |
 | `npc.catchBrakePerSecond` | 18 |
 | `npc.restBrakePerSecond` | 22 |
-| `nutrient.targetCount` | 3200 |
-| `nutrient.mass` | 1 |
+| `npc.decisionIntervalTicks` | 6 |
+| `npc.spatialCellSize` | 256 |
+| `nutrient.targetCount` | 9600 |
+| `nutrient.massMin..massMax` | 1..6 |
+| `nutrient.collisionRadiusScale` | 4.5 |
+| `nutrient.pointSizeBase` | 5.5 |
+| `nutrient.pointSizeMassScale` | 2.5 |
 
 종별 이동 수치:
 
@@ -118,6 +145,12 @@ interface NpcArchetype {
 | `larvoid` | 20~54 | 3.2 | 등속 | 0 | 82 | 0.4 |
 | `tentacle-amoeba` | 58~150 | 1.0 | 720 | 40 | 92 | 1.1 |
 | `diplococcus` | 14~42 | 0.42 | 부유 | 0 | 16 | 0.22 |
+| `streptococcus` | 16~48 | 1.4 | 900 | 55 | 120 | 1.8 |
+| `spirillum` | 8~30 | 2.0 | 1000 | 70 | 140 | 2.4 |
+| `radiolarian` | 72~180 | 0.85 | 650 | 30 | 80 | 0.9 |
+
+표의 `max speed`는 종별 기준값이며 실제 이동 상한과 constant/drift 목표 속도에는
+`gait.movementSpeedMultiplier=2`를 곱한다. `burst` drive 가속도는 곱하지 않는다.
 
 ## 2. 질량과 반경
 
@@ -138,7 +171,7 @@ radius(mass) = sqrt(mass) × radiusScale
 방향과 함께 목표 world 좌표로 전달한다. 포인터가 반지름 밖으로 나가도 방향은 유지하고 강도만 1로 제한한다.
 
 ```text
-phase = fract(previousPhase + gaitFrequency × (0.65 + 0.35 × inputStrength) × dt)
+phase = advanceBySegment(previousPhase, gaitFrequency, catchTimeScale, dt)
 frontReach = sineEase(phase, 0, reachEnd) 이후 catchEnd까지 회수
 drive = sinePulse(phase, reachEnd, driveEnd)
 rearCatch = sineEase(phase, driveEnd, catchEnd)
@@ -150,7 +183,7 @@ sideSign = gaitCycle이 짝수면 1, 홀수면 -1
 acceleration = (desired × burstAcceleration + perpendicular(desired) × lateralBurst × sideSign)
              × drive × inputStrength × massFactor
 velocity = velocity × exp(-brake × dt) + acceleration × dt
-speedLimit = maxSpeed × (0.35 + 0.65 × inputStrength) × massFactor
+speedLimit = maxSpeed × movementSpeedMultiplier × (0.35 + 0.65 × inputStrength) × massFactor
 velocity = clampMagnitude(velocity, speedLimit)
 position = position + velocity × dt
 ```
@@ -158,7 +191,9 @@ position = position + velocity × dt
 - 목표까지의 거리가 dead zone 안이면 추가 가속하지 않는다.
 - reach에서는 앞 이동축이 뻗는 동안 강하게 감속해 몸체가 거의 정지한다.
 - drive의 사인 펄스에서만 실제 급가속과 좌우 꿈틀이 발생한다.
-- catch에서는 뒤 이동축이 회수되는 동안 속도를 빠르게 줄이고, rest에서는 다음 발걸음 전 정지를 만든다.
+- drive 구간 phase 속도와 `burstAcceleration`은 유지한다. 이동 상한과 constant/drift 목표 속도만 2배로 높인다.
+- catch에서는 phase 진행률에 `catchTimeScale=0.5`를 적용해 뒤 이동축 회수가 기존보다 2배 오래 걸리며,
+  같은 늘어난 구간 동안 실제 감속도 함께 진행된다. rest에서는 다음 발걸음 전 정지를 만든다.
 - `gaitPhase`와 `gaitCycle`은 Simulation state다. Renderer는 같은 gait sample을 읽어 앞축·뒤축·막·내부
   과립을 표현하며, 위치와 같은 alpha로 `previousGaitPhase → gaitPhase`를 보간한다. 별도 render clock으로
   보행 위상을 다시 만들지 않는다.
@@ -184,8 +219,16 @@ MVP World는 Run 시작 viewport 가로·세로의 6배인 유한 Field다. Cell
 
 ## 5. Nutrient 흡수
 
-Player 또는 NPC의 충돌 반경과 Nutrient 중심이 접촉하면 흡수 후보가 된다. 같은 Nutrient에 여러 Cell이
-접촉하면 다음 순서로 승자를 고른다.
+Player의 충돌 반경과 Nutrient의 질량 파생 반경이 접촉하면 흡수 후보가 된다. Nutrient Mass와 반경은 다음과
+같이 계산한다.
+
+```text
+nutrient.mass = seededRandom(massMin, massMax)
+nutrient.radius = sqrt(nutrient.mass) × collisionRadiusScale
+nutrient.pointSize = pointSizeBase + sqrt(nutrient.mass) × pointSizeMassScale
+```
+
+같은 Nutrient에 여러 Cell이 접촉하는 경쟁 규칙은 NPC Nutrient 섭취를 구현할 때 다음 순서를 사용한다.
 
 1. tick 시작 시 더 가까운 중심 거리
 2. 더 큰 Mass
@@ -201,60 +244,78 @@ Nutrient는 한 번만 소비되고 SpawnSystem이 목표 밀도를 회복한다
 
 ## 6. Cell 흡수
 
-Cell A가 Cell B를 흡수하려면 모두 참이어야 한다.
+Cell A가 Cell B를 흡수하려면 모두 참이어야 한다. 접촉은 중심 진입 threshold가 아니라 두 물리 반경의 외곽이
+처음 닿는 순간부터 시작한다.
 
 ```text
 A.mass >= B.mass × cellAbsorbRatio
-distance(A, B) <= radius(A) + radius(B) × contactDepthRatio
+distance(A, B) <= radius(A) + radius(B)
 A와 B가 alive
 ```
 
-획득 질량:
+완료까지 획득 가능한 총 질량:
 
 ```text
-gainedMass = B.mass × cellEfficiency
+totalGainedMass = (startPreyMass - absorptionMinimumMass) × cellEfficiency
 ```
 
-포식 판정이 나면 즉시 결과를 끝내지 않고 `AbsorptionState`를 시작한다.
+포식 판정이 나면 즉시 결과를 끝내지 않고 `AbsorptionState`를 시작한다. `overlapDepth`와 `contactFactor`는 매
+fixed tick의 현재 Mass·반경·거리에서 다시 계산한다.
 
 ```text
-progress = clamp(elapsed / absorptionDurationSeconds, 0, 1)
-eased = smoothstep(progress)
+overlapDepth = max(0, radius(predator) + radius(prey) - distance)
+overlapRatio = clamp(overlapDepth / (2 × radius(prey)), 0, 1)
+contactFactor = max(absorptionMinimumContactFactor, overlapRatio)
+damageDelta = min(
+  prey.mass - absorptionMinimumMass,
+  startPreyMass × absorptionDamageFractionPerSecond × contactFactor × dt
+)
 prey.position = approach(prey.position, predator.position, absorptionPullPerSecond, dt)
-gainedDelta = preyStartMass × cellEfficiency × (eased - previousEased)
-predator.mass += gainedDelta
+prey.mass -= damageDelta
+predator.mass += damageDelta × cellEfficiency
+progress = 1 - prey.mass / startPreyMass
 ```
 
 - prey는 전이 동안 자체 이동과 새 흡수 후보에서 제외한다.
 - 한 predator는 동시에 하나의 prey만 흡수한다.
-- Mass 비율은 전이 시작 tick에 판정하며 이후 시각 scale 변화가 판정을 뒤집지 않는다.
+- Mass 비율은 전이 시작 tick에 판정하며 이후 Mass drain이 선점을 뒤집지 않는다.
+- 미세 접촉은 minimum contact factor로 천천히 drain되고, 깊이 겹칠수록 drain 속도가 연속적으로 증가한다.
+- prey와 predator의 실제 Mass는 첫 drain tick부터 함께 변하며 중심이 겹쳐도 한 tick에 완료하지 않는다.
 - 완료 시 NPC prey는 안전 위치에 respawn하고 `CellAbsorbed`를 만든다.
 - Player prey는 완료 시 `PlayerConsumed`와 `RunEnded`를 만들고 `GAME_OVER`로 전환한다.
 
 ## 7. NPC 판단
 
-NPC의 어그로 프로필은 Species RuleSet에서 고정한다. 감지 거리는 종별 `aggroRadius`이며 Mass와 독립이다.
+NPC의 어그로 프로필과 감지 거리는 Species RuleSet에서 고정한다. 공격 후보는 감지 반경과
+`cellAbsorbRatio`를 모두 만족해야 한다.
 
-- `pursue`: Player가 반경 안에 들어오면 크기와 무관하게 Player 방향으로 전환한다.
+- `pursue-player`: Player가 반경 안에 있고 자신이 Player를 흡수할 수 있을 때만 Player를 추적한다.
+- `pursue-cell`: Player와 NPC 중 반경 안에 있고 자신이 흡수할 수 있는 가장 가까운 Cell을 추적한다.
 - `flee`: Player가 반경 안에 들어오면 크기와 무관하게 반대 방향으로 전환한다.
-- `passive`: Player를 감지하거나 추적하지 않고 종의 기본 이동만 유지한다.
-- 반경 밖의 `pursue`/`flee` 개체는 seed 기반 wander를 한다.
-- 실제 접촉 결과는 어그로 성향이 아니라 `cellAbsorbRatio`만 결정한다.
+- `passive`: Player와 NPC를 감지하거나 추적하지 않고 종의 기본 이동만 유지한다.
+- 공격 후보 거리 동률은 더 작은 Entity ID를 선택한다.
+- 표적은 `decisionIntervalTicks=6`마다 spatial hash에서 다시 찾고, tick 사이에도 Mass·거리 조건이 깨지면 즉시
+  해제한다.
+- 반경 밖이거나 먹을 수 있는 후보가 없는 공격형과 `flee` 반경 밖 개체는 seed 기반 wander를 한다.
+- 실제 접촉 결과는 어그로 성향과 무관하게 두 Cell의 `cellAbsorbRatio`로 결정한다.
 
 종별 기준:
 
 | Species | 표시 이름 | 형태 | Aggro | 반경 | 이동 |
 |---|---|---|---|---:|---|
 | `micrococcus` | 미립구균 | 좁쌀형 소형 구균 | flee | 300 | 빠른 보행형 |
-| `ciliophoran` | 섬모편모충 | 섬모와 짧은 꼬리 | pursue | 390 | 빠른 보행형 |
+| `ciliophoran` | 섬모편모충 | 섬모와 짧은 꼬리 | pursue-player | 390 | 빠른 보행형 |
 | `larvoid` | 다족유생충 | 긴 몸통과 다수의 다리 | passive | 0 | 발 운동과 등속 이동 |
-| `tentacle-amoeba` | 촉수아메바 | 불규칙 몸통과 촉수 | pursue | 480 | 느린 보행형 |
+| `tentacle-amoeba` | 촉수아메바 | 불규칙 몸통과 촉수 | pursue-cell | 480 | 느린 보행형 |
 | `diplococcus` | 쌍구균 | 아령형 쌍구체 | passive | 0 | 저속 부유 |
+| `streptococcus` | 연쇄구균 | 휘어진 구체 사슬 | pursue-cell | 420 | 보행형 |
+| `spirillum` | 나선편모충 | 나선 몸통과 양끝 편모 | flee | 340 | 빠른 보행형 |
+| `radiolarian` | 방산포자충 | 중심 포낭과 방사 돌기 | pursue-cell | 520 | 무거운 보행형 |
 
 ## 8. Spawn 규칙
 
 - Field를 동일 크기의 cell로 나눈 stratified grid에 NPC와 Nutrient를 배치하고 각 cell 안에서 seed jitter를 준다.
-- NPC 540개와 Mass 1 Nutrient 3200개를 Field 전역에 stratified 배치한다.
+- NPC 1620개와 Mass 1~6 Nutrient 9600개를 Field 전역에 stratified 배치한다.
 - Player 시작 위치에서 `safeSpawnDistance` 이상 떨어진 곳에 NPC를 만든다.
 - 새 NPC는 Player의 시작 보호 시간 동안 Player를 흡수할 수 없다.
 - spawn 후보가 기존 큰 Cell과 겹치면 제한 횟수만큼 다시 찾는다.
@@ -266,13 +327,13 @@ NPC의 어그로 프로필은 Species RuleSet에서 고정한다. 감지 거리�
 한 Simulation Tick은 반드시 다음 순서를 지킨다.
 
 1. phase와 입력 sequence 확인
-2. NPC decision 갱신
+2. cell spatial hash 재구성과 주기 도래 NPC decision 갱신
 3. Player/NPC gait phase 갱신과 구간별 acceleration 계산
 4. velocity·position 적분과 world 경계 보정
 5. 진행 중 Absorption pull·질량 이전·완료 처리
-6. spatial index 재구성 또는 갱신
+6. 이동 뒤 cell spatial hash 재구성
 7. Nutrient 충돌 후보 수집·안정 정렬·흡수
-8. 새 Cell 접촉 후보의 Mass 판정과 Absorption 시작
+8. 모든 Cell 쌍의 외곽 접촉 후보를 안정 ID 순서로 처리하고 Absorption 시작
 9. spawn queue 적용
 10. Mass·유한값·Entity 불변 조건 검사
 11. 게임오버 판정

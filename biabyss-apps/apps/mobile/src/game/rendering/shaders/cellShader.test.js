@@ -22,13 +22,20 @@ describe('procedural microscope cell shader', () => {
     expect(cellFragmentShader).toContain('uniform float uOpticalStage')
   })
 
-  it('defines five species silhouettes and a suction progress input', () => {
+  it('defines eight species silhouettes and continuous feeding inputs', () => {
     expect(cellFragmentShader).toContain('micrococcusDistance')
     expect(cellFragmentShader).toContain('ciliophoranDistance')
     expect(cellFragmentShader).toContain('larvoidDistance')
     expect(cellFragmentShader).toContain('tentacleAmoebaDistance')
     expect(cellFragmentShader).toContain('diplococcusDistance')
+    expect(cellFragmentShader).toContain('streptococcusDistance')
+    expect(cellFragmentShader).toContain('spirillumDistance')
+    expect(cellFragmentShader).toContain('radiolarianDistance')
     expect(cellVertexShader).toContain('attribute float aAbsorption')
+    expect(cellVertexShader).toContain('attribute float aFeeding')
     expect(cellFragmentShader).toContain('varying float vAbsorption')
+    expect(cellFragmentShader).toContain('varying float vFeeding')
+    expect(cellFragmentShader).toContain('uniform float uPlaneOverscan')
+    expect(cellFragmentShader).toContain('* uPlaneOverscan')
   })
 })

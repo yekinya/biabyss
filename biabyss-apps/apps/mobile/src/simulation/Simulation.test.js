@@ -3,6 +3,13 @@ import { RULE_SET } from '../domain/rules/ruleSet.js'
 import { sampleGait } from '../domain/rules/gait.js'
 import { Simulation } from './Simulation.js'
 
+/** @param {Simulation} simulation @param {import('./Simulation.js').CellState[]} retained */
+function retainCells(simulation, retained) {
+  simulation.cells = retained
+  simulation.cellLookup = new Map(retained.map((cell) => [cell.id, cell]))
+  simulation.cellSpatialIndex.rebuild(retained)
+}
+
 describe('Simulation field', () => {
   it('creates a field 36 times the viewport area', () => {
     const simulation = new Simulation(1000, 600, 707)
@@ -11,16 +18,26 @@ describe('Simulation field', () => {
     )
     expect(simulation.cells).toHaveLength(RULE_SET.npc.count + 1)
     expect(simulation.nutrients).toHaveLength(RULE_SET.nutrient.targetCount)
-    expect(new Set(simulation.cells.slice(1).map((cell) => cell.speciesId)).size).toBe(5)
-    expect(new Set(simulation.cells.slice(1).map((cell) => cell.morph)).size).toBe(5)
+    expect(new Set(simulation.cells.slice(1).map((cell) => cell.speciesId)).size).toBe(8)
+    expect(new Set(simulation.cells.slice(1).map((cell) => cell.morph)).size).toBe(8)
     expect(RULE_SET.npc.archetypes.map((archetype) => archetype.name)).toEqual([
       '미립구균',
       '섬모편모충',
       '다족유생충',
       '촉수아메바',
       '쌍구균',
+      '연쇄구균',
+      '나선편모충',
+      '방산포자충',
     ])
-    expect(simulation.nutrients.every((nutrient) => nutrient.mass === 1)).toBe(true)
+    expect(
+      simulation.nutrients.every(
+        (nutrient) =>
+          nutrient.mass >= RULE_SET.nutrient.massMin &&
+          nutrient.mass <= RULE_SET.nutrient.massMax,
+      ),
+    ).toBe(true)
+    expect(new Set(simulation.nutrients.slice(0, 32).map((nutrient) => nutrient.mass)).size).toBeGreaterThan(1)
     const speciesCounts = RULE_SET.npc.archetypes.map(
       (archetype) => simulation.cells.filter((cell) => cell.speciesId === archetype.id).length,
     )
@@ -30,6 +47,14 @@ describe('Simulation field', () => {
         RULE_SET.npc.safeSpawnDistance - 0.001,
       )
     }
+  })
+
+  it('generates deterministic variable nutrient masses', () => {
+    const first = new Simulation(1000, 600, 909)
+    const second = new Simulation(1000, 600, 909)
+    expect(first.nutrients.slice(0, 64).map((nutrient) => nutrient.mass)).toEqual(
+      second.nutrients.slice(0, 64).map((nutrient) => nutrient.mass),
+    )
   })
 
   it('adds lateral movement instead of constant straight-line velocity', () => {
@@ -50,7 +75,7 @@ describe('Simulation field', () => {
     let peakSpeed = 0
     let settledSpeed = Number.POSITIVE_INFINITY
 
-    for (let tick = 0; tick < 37; tick += 1) {
+    for (let tick = 0; tick < 90; tick += 1) {
       const previousX = simulation.player.x
       const previousY = simulation.player.y
       simulation.step(1 / RULE_SET.simulationHz)
@@ -159,12 +184,15 @@ describe('Simulation field', () => {
     const fleeing = simulation.cells.find((cell) => cell.speciesId === 'micrococcus')
     const pursuing = simulation.cells.find((cell) => cell.speciesId === 'ciliophoran')
     if (!fleeing || !pursuing) throw new Error('aggro fixtures missing')
+    retainCells(simulation, [simulation.player, fleeing, pursuing])
     fleeing.x = simulation.player.x + 200
     fleeing.y = simulation.player.y - 40
     fleeing.heading = Math.PI / 2
     pursuing.x = simulation.player.x + 200
     pursuing.y = simulation.player.y + 40
     pursuing.heading = Math.PI / 2
+    pursuing.mass = 60
+    pursuing.nextDecisionTick = 0
     const fleeingStartDistance = Math.hypot(
       fleeing.x - simulation.player.x,
       fleeing.y - simulation.player.y,
@@ -191,6 +219,8 @@ describe('Simulation field', () => {
     const leftLarvoid = leftPlayer.cells.find((cell) => cell.speciesId === 'larvoid')
     const rightLarvoid = rightPlayer.cells.find((cell) => cell.speciesId === 'larvoid')
     if (!leftLarvoid || !rightLarvoid) throw new Error('larvoid fixture missing')
+    retainCells(leftPlayer, [leftPlayer.player, leftLarvoid])
+    retainCells(rightPlayer, [rightPlayer.player, rightLarvoid])
     leftLarvoid.x = rightLarvoid.x = leftPlayer.worldWidth / 2
     leftLarvoid.y = rightLarvoid.y = leftPlayer.worldHeight / 2
     leftLarvoid.heading = rightLarvoid.heading = 0.7
@@ -209,12 +239,45 @@ describe('Simulation field', () => {
     expect(leftLarvoid.x).toBe(rightLarvoid.x)
     expect(leftLarvoid.y).toBe(rightLarvoid.y)
     expect(Math.hypot(leftLarvoid.vx, leftLarvoid.vy)).toBeCloseTo(
-      RULE_SET.npc.archetypes[2].maxSpeed,
-      2,
+      RULE_SET.npc.archetypes[2].maxSpeed * RULE_SET.gait.movementSpeedMultiplier,
+      0,
     )
   })
 
-  it('keeps the tenfold population finite and stable for ten simulated seconds', () => {
+  it('does not pursue a player that is too large to absorb', () => {
+    const simulation = new Simulation(1000, 600, 505)
+    const attacker = simulation.cells.find((cell) => cell.speciesId === 'ciliophoran')
+    if (!attacker) throw new Error('ciliophoran fixture missing')
+    retainCells(simulation, [simulation.player, attacker])
+    attacker.mass = 20
+    attacker.x = simulation.player.x + 100
+    attacker.y = simulation.player.y
+    attacker.nextDecisionTick = 0
+    simulation.start()
+    simulation.step(1 / RULE_SET.simulationHz)
+    expect(attacker.targetId).toBeUndefined()
+  })
+
+  it('lets all-cell predators select a smaller NPC instead of a larger player', () => {
+    const simulation = new Simulation(1000, 600, 606)
+    const predator = simulation.cells.find((cell) => cell.speciesId === 'tentacle-amoeba')
+    const prey = simulation.cells.find((cell) => cell.speciesId === 'micrococcus')
+    if (!predator || !prey) throw new Error('all-cell aggro fixtures missing')
+    retainCells(simulation, [simulation.player, predator, prey])
+    simulation.player.mass = 200
+    predator.mass = 80
+    predator.x = simulation.player.x + 300
+    predator.y = simulation.player.y
+    predator.nextDecisionTick = 0
+    prey.mass = 20
+    prey.x = predator.x + 100
+    prey.y = predator.y
+    simulation.start()
+    simulation.step(1 / RULE_SET.simulationHz)
+    expect(predator.targetId).toBe(prey.id)
+  })
+
+  it('keeps the tripled dense population finite and stable for ten simulated seconds', () => {
     const simulation = new Simulation(1000, 600, 0x51a7)
     simulation.start()
     simulation.invulnerableUntil = Number.POSITIVE_INFINITY
@@ -222,9 +285,9 @@ describe('Simulation field', () => {
       simulation.step(1 / RULE_SET.simulationHz)
     }
 
-    expect(RULE_SET.world.populationMultiplier).toBe(10)
-    expect(simulation.cells).toHaveLength(541)
-    expect(simulation.nutrients).toHaveLength(3200)
+    expect(RULE_SET.world.populationMultiplier).toBe(30)
+    expect(simulation.cells).toHaveLength(1621)
+    expect(simulation.nutrients).toHaveLength(9600)
     for (const cell of simulation.cells) {
       expect([cell.x, cell.y, cell.vx, cell.vy, cell.mass].every(Number.isFinite)).toBe(true)
     }
@@ -242,6 +305,7 @@ describe('Simulation field', () => {
   it('absorbs nutrients exactly once and increases mass', () => {
     const simulation = new Simulation(1000, 600, 707)
     const nutrient = simulation.nutrients[0]
+    simulation.nutrients = [nutrient]
     nutrient.x = simulation.player.x
     nutrient.y = simulation.player.y
     const previousMass = simulation.player.mass
@@ -254,10 +318,71 @@ describe('Simulation field', () => {
     expect(simulation.takeEvents()).toHaveLength(0)
   })
 
+  it('starts at outer contact and drains mass faster with deeper overlap', () => {
+    /** @param {number} overlap */
+    const drainOnce = (overlap) => {
+      const simulation = new Simulation(1000, 600, 717)
+      const prey = simulation.cells.find((cell) => cell.speciesId === 'micrococcus')
+      if (!prey) throw new Error('micrococcus fixture missing')
+      retainCells(simulation, [simulation.player, prey])
+      simulation.player.mass = 36
+      prey.mass = 10
+      prey.x =
+        simulation.player.x +
+        Math.sqrt(simulation.player.mass) * RULE_SET.mass.radiusScale +
+        Math.sqrt(prey.mass) * RULE_SET.mass.radiusScale -
+        overlap
+      prey.y = simulation.player.y
+      simulation.elapsed = simulation.invulnerableUntil
+      simulation.cellSpatialIndex.rebuild(simulation.cells)
+      simulation.resolveCellContacts()
+      expect(simulation.activeAbsorptions).toHaveLength(1)
+      const previousPreyMass = prey.mass
+      const previousPredatorMass = simulation.player.mass
+      simulation.updateAbsorptions(1 / RULE_SET.simulationHz)
+      return {
+        preyLoss: previousPreyMass - prey.mass,
+        predatorGain: simulation.player.mass - previousPredatorMass,
+      }
+    }
+
+    const shallow = drainOnce(0.001)
+    const deep = drainOnce(20)
+    expect(shallow.preyLoss).toBeGreaterThan(0)
+    expect(shallow.predatorGain).toBeCloseTo(
+      shallow.preyLoss * RULE_SET.mass.cellEfficiency,
+      8,
+    )
+    expect(deep.preyLoss).toBeGreaterThan(shallow.preyLoss)
+  })
+
+  it('allows an all-cell predator to drain another NPC', () => {
+    const simulation = new Simulation(1000, 600, 818)
+    const predator = simulation.cells.find((cell) => cell.speciesId === 'tentacle-amoeba')
+    const prey = simulation.cells.find((cell) => cell.speciesId === 'micrococcus')
+    if (!predator || !prey) throw new Error('NPC absorption fixtures missing')
+    retainCells(simulation, [simulation.player, predator, prey])
+    predator.mass = 80
+    prey.mass = 10
+    predator.x = simulation.player.x + 500
+    predator.y = simulation.player.y
+    prey.x = predator.x
+    prey.y = predator.y
+    simulation.elapsed = simulation.invulnerableUntil
+    simulation.cellSpatialIndex.rebuild(simulation.cells)
+    simulation.resolveCellContacts()
+    expect(prey.absorbedBy).toBe(predator.id)
+    const previousPreyMass = prey.mass
+    simulation.updateAbsorptions(1 / RULE_SET.simulationHz)
+    expect(prey.mass).toBeLessThan(previousPreyMass)
+    expect(predator.feedingProgress).toBeGreaterThan(0)
+  })
+
   it('pulls in a smaller aggressive cell before completing absorption', () => {
     const simulation = new Simulation(1000, 600, 707)
     const prey = simulation.cells.find((cell) => cell.speciesId === 'ciliophoran')
     if (!prey) throw new Error('ciliophoran fixture missing')
+    retainCells(simulation, [simulation.player, prey])
     simulation.nutrients.length = 0
     prey.x = simulation.player.x
     prey.y = simulation.player.y
@@ -275,17 +400,19 @@ describe('Simulation field', () => {
     for (let tick = 0; tick < 20; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
     expect(prey.absorptionProgress).toBeGreaterThan(0)
     expect(prey.absorptionProgress).toBeLessThan(1)
+    expect(prey.mass).toBeLessThan(10)
     expect(simulation.player.mass).toBeGreaterThan(previousMass)
     expect(simulation.player.mass).toBeLessThan(previousMass + 10 * RULE_SET.mass.cellEfficiency)
     expect(simulation.absorbed).toBe(0)
 
-    for (let tick = 0; tick < 60 && simulation.activeAbsorptions.length > 0; tick += 1) {
+    for (let tick = 0; tick < 120 && simulation.activeAbsorptions.length > 0; tick += 1) {
       simulation.step(1 / RULE_SET.simulationHz)
     }
     expect(simulation.activeAbsorptions).toHaveLength(0)
     expect(simulation.absorbed).toBe(1)
     expect(simulation.player.mass).toBeCloseTo(
-      previousMass + 10 * RULE_SET.mass.cellEfficiency,
+      previousMass +
+        (10 - RULE_SET.mass.absorptionMinimumMass) * RULE_SET.mass.cellEfficiency,
       8,
     )
     expect(prey.speciesId).toBe(speciesId)
@@ -296,6 +423,7 @@ describe('Simulation field', () => {
   it('prevents duplicate prey claims and simultaneous predator targets', () => {
     const simulation = new Simulation(1000, 600, 808)
     const prey = simulation.cells.filter((cell) => cell.kind === 'npc').slice(0, 2)
+    retainCells(simulation, [simulation.player, ...prey])
     simulation.nutrients.length = 0
     for (const cell of prey) {
       cell.x = simulation.player.x
@@ -314,6 +442,7 @@ describe('Simulation field', () => {
     const simulation = new Simulation(1000, 600, 707)
     const predator = simulation.cells.find((cell) => cell.speciesId === 'tentacle-amoeba')
     if (!predator) throw new Error('tentacle amoeba fixture missing')
+    retainCells(simulation, [simulation.player, predator])
     simulation.nutrients.length = 0
     predator.x = simulation.player.x
     predator.y = simulation.player.y
@@ -326,7 +455,7 @@ describe('Simulation field', () => {
     for (let tick = 0; tick < 20; tick += 1) simulation.step(1 / RULE_SET.simulationHz)
     expect(simulation.phase).toBe('running')
     expect(simulation.player.absorptionProgress).toBeGreaterThan(0)
-    for (let tick = 0; tick < 60 && simulation.phase === 'running'; tick += 1) {
+    for (let tick = 0; tick < 120 && simulation.phase === 'running'; tick += 1) {
       simulation.step(1 / RULE_SET.simulationHz)
     }
     expect(simulation.phase).toBe('game-over')

@@ -94,5 +94,5 @@ develop staging 후보에서 최소 다음 기기를 검증한다.
 
 ## 7. 현재 공백
 
-기초 prototype은 아직 fixed-step Simulation, seed PRNG, spatial hash, context restore와 native project를 갖추지
-않았다. 해당 항목을 구현하기 전 “규칙 엔진 완료” 또는 “앱 배포 가능”으로 판정하지 않는다.
+기초 prototype은 아직 WebGL context restore와 native project를 갖추지 않았다. 해당 항목을 구현하기 전
+“앱 배포 가능”으로 판정하지 않는다.

@@ -12,6 +12,7 @@
 | `shader.cell.soft-locomotion.v1` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | REJECTED | 속도 기반 단순 타원 scale | SPEC-BIABYSS-20260820-soft-cell-locomotion |
 | `shader.cell.microscope-organelles.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 회백 타원 + 이중 rim | SPEC-BIABYSS-20260821-microscope-gait-stages |
 | `shader.cell.ecology-archetypes.v3` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 종별 단순 SDF | SPEC-BIABYSS-20260821-npc-ecology-absorption |
+| `shader.cell.ecology-archetypes.v4` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/cellShader.js` | DRAFT | 8종 단순 SDF + overscan | SPEC-BIABYSS-20260821-predator-ecosystem-density |
 | `material.cell.instanced-swarm.v1` | material | `biabyss-apps/apps/mobile/src/game/rendering/CellRenderer.js` | DRAFT | 종별 공유 Mesh | SPEC-BIABYSS-20260821-npc-ecology-absorption |
 | `shader.particle.nutrient-swarm.v2` | shader | `biabyss-apps/apps/mobile/src/game/rendering/shaders/particleShader.js` | DRAFT | 단색 Point | SPEC-BIABYSS-20260821-npc-ecology-absorption |
 | `material.ui.joystick.v1` | procedural material | `biabyss-apps/apps/mobile/src/game/rendering/JoystickRenderer.js` | DRAFT | 입력은 유지하고 표시만 생략 | SPEC-BIABYSS-20260820-soft-cell-locomotion |
