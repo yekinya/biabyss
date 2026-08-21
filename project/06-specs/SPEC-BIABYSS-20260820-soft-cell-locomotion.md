@@ -21,7 +21,7 @@
 - 고정 배경 bitmap·texture sampling 제거, 다중 noise field의 시간 기반 domain warp와 색상 블렌딩
 - 감소 모션에서 환경 변화량과 pulse를 낮추는 shader fallback
 - pointer capture, up/cancel/blur/visibility 해제 처리
-- 조이패드 강도·결정성·해제 동작 단위 검사와 브라우저 smoke
+- 조이패드 강도·결정성 단위 검사와 정적 shader contract 검사
 
 ## 범위 밖
 
@@ -70,7 +70,7 @@
 5. cell shader와 transform에 비대칭 앞막/뒤막 위상, 부드러운 경계, 쌍광핵과 내부 광점 대비를 적용한다.
 6. 내부 particle에 속도 반대 관성, 속도 기반 나선 회전과 확산·응집 반경을 적용한다.
 7. field shader에서 bitmap sampler를 제거하고 저비용 다중 noise·domain warp·색상 순환으로 환경을 합성한다.
-8. 단위·결정성 검사, 정적 검사, production build와 데스크톱·모바일 browser smoke를 수행한다.
+8. 단위·결정성 검사, 정적 검사와 production build를 수행한다.
 
 ## 위험과 rollback
 
@@ -104,7 +104,7 @@
 
 - Node 22.22.1 / npm 10.9.4
 - `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`
-- Chromium desktop 1440×900, mobile 390×844
-- pointerdown/move/up/cancel, 중앙·절반·가장자리 강도, 카메라 추적 중 조이패드 화면 고정
-- Canvas 1개, console error/warning과 runtime 외부 request 0
+- 중앙·절반·가장자리 조이패드 강도 단위 검사
+- 고정 bitmap·texture sampler·production PNG data URI 0 정적 검사
+- 브라우저 자동화·smoke·screenshot 검사는 저장소 규칙에 따라 제외
 - native project가 아직 없으므로 iOS/Android app smoke는 후속 packaging SPEC 공백으로 유지한다.
