@@ -4,7 +4,15 @@ import * as THREE from 'three'
 import { interpolateGaitPhase, sampleGait } from '../../domain/rules/gait.js'
 import { canAbsorb, radiusForMass } from '../../domain/rules/mass.js'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
-import { cellFragmentShader, cellVertexShader } from './shaders/cellShader.js'
+import {
+  cellFallbackFragmentShader,
+  cellFallbackVertexShader,
+  cellFragmentShader,
+  cellVertexShader,
+} from './shaders/cellShader.js'
+
+export const CELL_PRIMARY_ACTIVE_ATTRIBUTE_SLOTS = 8
+export const CELL_FALLBACK_ACTIVE_ATTRIBUTE_SLOTS = 5
 
 export class CellRenderer {
   /** @param {THREE.Scene} scene @param {number} capacity */
@@ -12,28 +20,17 @@ export class CellRenderer {
     this.scene = scene
     this.capacity = capacity
     this.geometry = new THREE.PlaneGeometry(2, 2, 1, 1)
-    this.phaseAttribute = this.createAttribute(1)
-    this.morphAttribute = this.createAttribute(1)
-    this.threatAttribute = this.createAttribute(1)
-    this.gaitPhaseAttribute = this.createAttribute(1)
-    this.frontReachAttribute = this.createAttribute(1)
-    this.driveAttribute = this.createAttribute(1)
-    this.rearCatchAttribute = this.createAttribute(1)
-    this.absorptionAttribute = this.createAttribute(1)
-    this.feedingAttribute = this.createAttribute(1)
-    this.colorAttribute = this.createAttribute(3)
-    this.geometry.setAttribute('aPhase', this.phaseAttribute)
-    this.geometry.setAttribute('aMorph', this.morphAttribute)
-    this.geometry.setAttribute('aThreat', this.threatAttribute)
-    this.geometry.setAttribute('aGaitPhase', this.gaitPhaseAttribute)
-    this.geometry.setAttribute('aFrontReach', this.frontReachAttribute)
-    this.geometry.setAttribute('aDrive', this.driveAttribute)
-    this.geometry.setAttribute('aRearCatch', this.rearCatchAttribute)
-    this.geometry.setAttribute('aAbsorption', this.absorptionAttribute)
-    this.geometry.setAttribute('aFeeding', this.feedingAttribute)
-    this.geometry.setAttribute('aColor', this.colorAttribute)
+    // data0: phase, morph, threat, gaitPhase
+    // data1: frontReach, drive, rearCatch, absorption
+    // data2: feeding, color.r, color.g, color.b
+    this.cellData0Attribute = this.createAttribute(4)
+    this.cellData1Attribute = this.createAttribute(4)
+    this.cellData2Attribute = this.createAttribute(4)
+    this.geometry.setAttribute('aCellData0', this.cellData0Attribute)
+    this.geometry.setAttribute('aCellData1', this.cellData1Attribute)
+    this.geometry.setAttribute('aCellData2', this.cellData2Attribute)
 
-    this.material = new THREE.ShaderMaterial({
+    this.primaryMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
         uOpticalStage: { value: 0 },
@@ -46,7 +43,18 @@ export class CellRenderer {
       side: THREE.DoubleSide,
       blending: THREE.NormalBlending,
     })
-    this.mesh = new THREE.InstancedMesh(this.geometry, this.material, capacity)
+    this.fallbackMaterial = new THREE.ShaderMaterial({
+      vertexShader: cellFallbackVertexShader,
+      fragmentShader: cellFallbackFragmentShader,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.NormalBlending,
+    })
+    this.material = this.primaryMaterial
+    this.fallbackActive = false
+    this.fallbackReason = null
+    this.mesh = new THREE.InstancedMesh(this.geometry, this.primaryMaterial, capacity)
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     this.mesh.frustumCulled = false
     this.mesh.renderOrder = 6
@@ -112,41 +120,62 @@ export class CellRenderer {
       )
       this.transform.updateMatrix()
       this.mesh.setMatrixAt(index, this.transform.matrix)
-      this.phaseAttribute.setX(index, cell.phase)
-      this.morphAttribute.setX(index, cell.morph)
-      this.threatAttribute.setX(index, threat ? 1 : 0)
-      this.gaitPhaseAttribute.setX(index, gaitPhase)
-      this.frontReachAttribute.setX(index, gait.frontReach)
-      this.driveAttribute.setX(index, gait.drive)
-      this.rearCatchAttribute.setX(index, gait.rearCatch)
-      this.absorptionAttribute.setX(index, absorption)
-      this.feedingAttribute.setX(index, feeding)
-      this.colorAttribute.setXYZ(index, this.color.r, this.color.g, this.color.b)
+      this.cellData0Attribute.setXYZW(
+        index,
+        cell.phase,
+        cell.morph,
+        threat ? 1 : 0,
+        gaitPhase,
+      )
+      this.cellData1Attribute.setXYZW(
+        index,
+        gait.frontReach,
+        gait.drive,
+        gait.rearCatch,
+        absorption,
+      )
+      this.cellData2Attribute.setXYZW(
+        index,
+        feeding,
+        this.color.r,
+        this.color.g,
+        this.color.b,
+      )
     }
 
     this.mesh.count = count
     this.mesh.instanceMatrix.needsUpdate = true
     for (const attribute of [
-      this.phaseAttribute,
-      this.morphAttribute,
-      this.threatAttribute,
-      this.gaitPhaseAttribute,
-      this.frontReachAttribute,
-      this.driveAttribute,
-      this.rearCatchAttribute,
-      this.absorptionAttribute,
-      this.feedingAttribute,
-      this.colorAttribute,
+      this.cellData0Attribute,
+      this.cellData1Attribute,
+      this.cellData2Attribute,
     ]) {
       attribute.needsUpdate = true
     }
-    this.material.uniforms.uTime.value = time
-    this.material.uniforms.uOpticalStage.value = opticalStage
+    this.primaryMaterial.uniforms.uTime.value = time
+    this.primaryMaterial.uniforms.uOpticalStage.value = opticalStage
+  }
+
+  /** @param {number} availableSlots */
+  ensureAttributeBudget(availableSlots) {
+    if (availableSlots < CELL_PRIMARY_ACTIVE_ATTRIBUTE_SLOTS) {
+      this.useFallbackMaterial('attribute-budget')
+    }
+  }
+
+  /** @param {'attribute-budget' | 'shader-link'} reason */
+  useFallbackMaterial(reason) {
+    if (this.fallbackActive) return
+    this.fallbackActive = true
+    this.fallbackReason = reason
+    this.material = this.fallbackMaterial
+    this.mesh.material = this.fallbackMaterial
   }
 
   dispose() {
     this.scene.remove(this.mesh)
     this.geometry.dispose()
-    this.material.dispose()
+    this.primaryMaterial.dispose()
+    this.fallbackMaterial.dispose()
   }
 }

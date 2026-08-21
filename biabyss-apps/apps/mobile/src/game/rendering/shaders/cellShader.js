@@ -1,16 +1,9 @@
 // @ts-check
 
 export const cellVertexShader = /* glsl */ `
-  attribute float aPhase;
-  attribute float aMorph;
-  attribute float aThreat;
-  attribute float aGaitPhase;
-  attribute float aFrontReach;
-  attribute float aDrive;
-  attribute float aRearCatch;
-  attribute float aAbsorption;
-  attribute float aFeeding;
-  attribute vec3 aColor;
+  attribute vec4 aCellData0;
+  attribute vec4 aCellData1;
+  attribute vec4 aCellData2;
 
   varying vec2 vUv;
   varying float vPhase;
@@ -25,22 +18,55 @@ export const cellVertexShader = /* glsl */ `
   varying vec3 vColor;
 
   void main() {
-    vUv = uv;
-    vPhase = aPhase;
-    vMorph = aMorph;
-    vThreat = aThreat;
-    vGaitPhase = aGaitPhase;
-    vFrontReach = aFrontReach;
-    vDrive = aDrive;
-    vRearCatch = aRearCatch;
-    vAbsorption = aAbsorption;
-    vFeeding = aFeeding;
-    vColor = aColor;
+    vUv = position.xy * 0.5 + 0.5;
+    vPhase = aCellData0.x;
+    vMorph = aCellData0.y;
+    vThreat = aCellData0.z;
+    vGaitPhase = aCellData0.w;
+    vFrontReach = aCellData1.x;
+    vDrive = aCellData1.y;
+    vRearCatch = aCellData1.z;
+    vAbsorption = aCellData1.w;
+    vFeeding = aCellData2.x;
+    vColor = aCellData2.yzw;
     vec4 transformed = vec4(position, 1.0);
     #ifdef USE_INSTANCING
       transformed = instanceMatrix * transformed;
     #endif
     gl_Position = projectionMatrix * modelViewMatrix * transformed;
+  }
+`
+
+export const cellFallbackVertexShader = /* glsl */ `
+  varying vec2 vUv;
+
+  void main() {
+    vUv = position.xy * 0.5 + 0.5;
+    vec4 transformed = vec4(position, 1.0);
+    #ifdef USE_INSTANCING
+      transformed = instanceMatrix * transformed;
+    #endif
+    gl_Position = projectionMatrix * modelViewMatrix * transformed;
+  }
+`
+
+export const cellFallbackFragmentShader = /* glsl */ `
+  precision mediump float;
+
+  varying vec2 vUv;
+
+  void main() {
+    vec2 p = (vUv - 0.5) * 2.0;
+    float distanceToBody = length(p * vec2(0.82, 1.18)) - 0.58;
+    float body = 1.0 - smoothstep(-0.018, 0.025, distanceToBody);
+    float outerMembrane = 1.0 - smoothstep(0.012, 0.052, abs(distanceToBody));
+    float innerMembrane = 1.0 - smoothstep(0.012, 0.036, abs(distanceToBody + 0.075));
+    vec3 cytoplasm = vec3(0.58, 0.66, 0.61);
+    vec3 membrane = vec3(0.11, 0.14, 0.13);
+    vec3 color = mix(cytoplasm, membrane, max(outerMembrane, innerMembrane * 0.72));
+    float alpha = body * (0.64 + outerMembrane * 0.3);
+    if (alpha < 0.015) discard;
+    gl_FragColor = vec4(color, alpha);
   }
 `
 
@@ -216,18 +242,19 @@ export const cellFragmentShader = /* glsl */ `
       (membraneGrain - 0.5) * 0.016;
     float distanceToMembrane = shapeDistance(softP) + cilia;
     float body = 1.0 - smoothstep(-0.018, 0.035, distanceToMembrane);
-    float outerHalo = 1.0 - smoothstep(0.03, 0.085, abs(distanceToMembrane - 0.035));
-    float rim = 1.0 - smoothstep(0.008, 0.052 + vThreat * 0.018, abs(distanceToMembrane));
+    float phaseHalo = 1.0 - smoothstep(0.018, 0.07, abs(distanceToMembrane - 0.045));
+    float outerMembrane = 1.0 - smoothstep(0.007, 0.044 + vThreat * 0.018, abs(distanceToMembrane));
+    float innerMembrane = 1.0 - smoothstep(0.01, 0.035, abs(distanceToMembrane + 0.075));
     float inner = 1.0 - smoothstep(-0.31, -0.045, distanceToMembrane);
 
     float stage01 = smoothstep(0.18, 0.92, uOpticalStage);
     float stage12 = smoothstep(1.12, 1.9, uOpticalStage);
     vec3 bodyColor = mix(
-      mix(vec3(0.63, 0.66, 0.64), vec3(0.46, 0.54, 0.42), stage01),
-      vec3(0.51, 0.51, 0.37),
+      mix(vec3(0.57, 0.66, 0.62), vec3(0.42, 0.54, 0.4), stage01),
+      vec3(0.48, 0.5, 0.34),
       stage12
     );
-    vec3 membraneColor = mix(vec3(0.14, 0.16, 0.16), vColor, 0.42);
+    vec3 membraneColor = mix(vec3(0.075, 0.095, 0.09), vColor * 0.62, 0.34);
     float cytoplasm = noise(softP * 5.4 + vec2(t * 0.09, -t * 0.06));
     vec3 color = bodyColor * (0.88 + cytoplasm * 0.14);
 
@@ -265,15 +292,16 @@ export const cellFragmentShader = /* glsl */ `
     float granuleDepth = 0.36 + granuleSeed * 0.5;
 
     color = mix(color, bodyColor * 1.08, vacuoleCenters * 0.46);
-    color = mix(color, membraneColor * 0.72, vacuoleEdges * 0.62);
-    color = mix(color, membraneColor * granuleDepth, granuleShape * 0.72);
+    color = mix(color, membraneColor * 0.66, vacuoleEdges * 0.76);
+    color = mix(color, membraneColor * granuleDepth, granuleShape * 0.86);
     color = mix(color, membraneColor * 0.42, movementAxes * 0.88);
-    color = mix(color, membraneColor, rim * (0.82 + vThreat * 0.12));
-    color += outerHalo * vec3(0.08, 0.085, 0.08);
+    color = mix(color, membraneColor * 0.82, innerMembrane * 0.72);
+    color = mix(color, membraneColor, outerMembrane * (0.9 + vThreat * 0.08));
+    color += phaseHalo * vec3(0.065, 0.075, 0.07);
     color = mix(color, membraneColor * 0.62, vAbsorption * 0.2);
     color = mix(color, bodyColor * 1.04, vFeeding * inner * 0.08);
 
-    float alpha = body * (0.48 + rim * 0.38 + granuleShape * 0.08) + outerHalo * 0.07;
+    float alpha = body * (0.64 + outerMembrane * 0.29 + granuleShape * 0.06) + phaseHalo * 0.12;
     alpha *= 1.0 - vAbsorption * 0.18;
     if (alpha < 0.015) discard;
     gl_FragColor = vec4(color, alpha);

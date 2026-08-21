@@ -78,6 +78,10 @@ export class BiabyssRenderer {
     this.scene.add(this.fieldBoundary)
 
     this.cellRenderer = new CellRenderer(this.scene, simulation.cells.length)
+    this.cellRenderer.ensureAttributeBudget(this.renderer.capabilities.maxAttributes)
+    this.shaderErrorCount = 0
+    this.handleShaderError = this.handleShaderError.bind(this)
+    this.renderer.debug.onShaderError = this.handleShaderError
     this.ambientParticles = new AmbientParticles(
       this.scene,
       simulation.worldWidth,
@@ -253,6 +257,9 @@ export class BiabyssRenderer {
         (this.simulation.viewportWidth * this.simulation.viewportHeight),
       cells: this.simulation.cells.length,
       cellBatching: 'instanced-mesh',
+      cellMaterialFallback: this.cellRenderer.fallbackActive,
+      cellMaterialFallbackReason: this.cellRenderer.fallbackReason,
+      shaderErrorCount: this.shaderErrorCount,
       speciesCounts,
       nutrients: this.simulation.nutrients.length,
       activeAbsorptions: this.simulation.activeAbsorptions.length,
@@ -274,9 +281,23 @@ export class BiabyssRenderer {
     this.contextLost = false
   }
 
+  /**
+   * @param {WebGLRenderingContext | WebGL2RenderingContext} gl
+   * @param {WebGLProgram} _program
+   * @param {WebGLShader} vertexShader
+   */
+  handleShaderError(gl, _program, vertexShader) {
+    this.shaderErrorCount += 1
+    const vertexSource = gl.getShaderSource(vertexShader) ?? ''
+    if (vertexSource.includes('aCellData0')) {
+      this.cellRenderer.useFallbackMaterial('shader-link')
+    }
+  }
+
   dispose() {
     this.renderer.domElement.removeEventListener('webglcontextlost', this.handleContextLost)
     this.renderer.domElement.removeEventListener('webglcontextrestored', this.handleContextRestored)
+    this.renderer.debug.onShaderError = null
     this.cellRenderer.dispose()
     this.ambientParticles.dispose()
     this.nutrientParticles.dispose()
