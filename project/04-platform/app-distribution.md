@@ -12,7 +12,7 @@ runtime 경계를 추가할 이점은 작다.
 
 추천 조합:
 
-- GitHub Actions: feature/develop/main PR의 typecheck, lint, test, web build
+- 로컬 Node/npm: feature PR의 typecheck, lint, test, web build
 - Codemagic: macOS build machine, iOS/Android signing, TestFlight와 Google Play track 배포
 - App Store Connect TestFlight: iOS staging
 - Google Play Internal testing: Android staging
@@ -24,12 +24,12 @@ Codemagic 설정과 signing secret은 실제 Apple/Google 개발자 계정이 �
 
 | Git ref | 결과 | 외부 배포 |
 |---|---|---|
-| `feature/*` | web quality gate | 없음 |
+| `feature/*` | 로컬 web quality gate | 없음 |
 | `develop` | unsigned native build + staging 후보 | TestFlight internal / Play internal |
 | `main` | signed release candidate | App Store / Play production |
 | version tag | immutable release evidence | 해당 store build와 연결 |
 
-웹 `dist/`는 공개 URL에 운영 배포하지 않는다. 로컬 개발 서버와 CI artifact는 검증 전용이다.
+웹 `dist/`는 공개 URL에 운영 배포하지 않는다. 로컬 개발 서버와 build artifact는 개발 전용이다.
 
 ## 4. 빌드 원칙
 

@@ -60,12 +60,12 @@ root이고 저장소 root에는 실행 앱의 `src`, `package.json`, Vite·TypeS
 8. 앱 실행 중 필요한 폰트·셰이더·음향·이미지는 번들에 포함한다. 외부 CDN과 원격 폰트에 의존하지 않는다.
 9. WebGL context loss, 앱 background/foreground, 화면 회전·resize, 저사양·감소 모션을 처리한다.
 10. 네이티브 코드는 Capacitor 셸과 승인된 plugin adapter에만 둔다. 게임 규칙을 Swift/Kotlin에 복제하지 않는다.
-11. 브라우저 개발 빌드는 검증 수단이지 공개 배포 채널이 아니다. 운영 산출물은 서명된 앱 번들이다.
+11. 브라우저 개발 빌드는 구현 보조 수단이지 테스트·공개 배포 채널이 아니다. 운영 산출물은 서명된 앱 번들이다.
 12. 온라인 사람 멀티플레이, 서버, 광고, 결제, 계정, 원격 분석 SDK는 별도 SPEC과 개인정보 검토 전까지 추가하지 않는다.
 
 ## 6. 개발·검증 완료 조건
 
-모든 변경은 `분석 → 문서 설계 → 구현 → 정적 검사 → 단위/결정성 검사 → 브라우저 smoke → 앱 smoke → PR → 병합`
+모든 변경은 `분석 → 문서 설계 → 구현 → 정적 검사 → 단위/결정성 검사 → 앱 smoke → PR → 병합`
 순서를 따른다.
 
 최소 필수 검사는 다음과 같다.
@@ -81,16 +81,21 @@ npm run build
 `test`가 아직 없는 기초 단계에서는 SPEC에 공백을 명시하고, 테스트 기반을 만드는 작업을 우선한다. 검증을
 우회하는 skip, assertion 삭제, `--force` 설치는 허용하지 않는다.
 
+GitHub Actions workflow는 사용하거나 추가하지 않는다. 필수 품질 게이트는 고정 Node 버전에서 위 명령을
+로컬 실행한 결과다. 브라우저 자동화, 브라우저 smoke와 screenshot 검사는 모든 작업의 검사 항목·완료 조건·
+병합 게이트에서 항상 제외한다. 네이티브 staging과 스토어 릴리스의 앱 smoke는 유지한다.
+
 ## 7. Git 브랜치와 자동 병합 계약
 
 - 브랜치 계층은 `main → develop → feature/*`다.
 - `main`은 스토어 운영 기준, `develop`은 스테이징·통합 기준이다.
 - 기능 브랜치는 최신 `develop`에서 `feature/<SPEC-ID>`로 만든다.
-- 개발 PR의 base는 항상 `develop`, head는 항상 `feature/*`다.
+- 기능·버그·문서·도구·규칙 변경 PR의 base는 항상 `develop`, head는 항상 `feature/*`다.
 - `main`과 `develop`에 직접 push하지 않는다. 원격 저장소 최초 부트스트랩만 예외다.
-- 구현 에이전트는 작업 완료 후 feature commit·push·PR 생성에 이어 필수 check를 확인하고 squash merge와
+- 구현 에이전트는 작업 완료 후 로컬 필수 검사를 통과하고 feature commit·push·PR 생성에 이어 squash merge와
   원격 feature 삭제까지 수행한다. PR 생성만 하고 사용자에게 병합을 넘기지 않는다.
-- check 실패, conflict, 권한 부족이면 병합하지 않고 feature에서 수정한다. 외부 권한 문제만 사용자에게 보고한다.
+- 로컬 검사 실패, conflict, review finding 또는 권한 부족이면 병합하지 않고 feature에서 수정한다. 외부 권한
+  문제만 사용자에게 보고한다.
 - `develop → main`은 명시적인 릴리스 작업에서만 수행한다. 릴리스 PR도 필수 앱 빌드·스토어 게이트 통과 뒤
   담당 에이전트가 병합한다.
 - Conventional Commits를 사용하고 commit/PR에 SPEC-ID를 연결한다.

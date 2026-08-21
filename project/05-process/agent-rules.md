@@ -66,17 +66,18 @@ SPEC 필수 항목:
 
 ### V — 검증
 
-- `test-strategy.md`의 Q1~Q5를 현재 범위에 맞게 수행한다.
+- `test-strategy.md`의 Q1~Q4를 현재 범위에 맞게 수행한다.
 - 실패를 skip하거나 threshold를 낮춰 통과시키지 않는다.
-- 브라우저 smoke는 console error와 Canvas 초기화만이 아니라 핵심 입력·상태 전이를 확인한다.
+- 브라우저 자동화, 브라우저 smoke와 screenshot 검사는 수행 목록·완료 조건·병합 게이트에 넣지 않는다.
 
 ### M — 전달과 병합
 
 - diff에서 요구 밖 변경과 부모 프로젝트 흔적을 검사한다.
 - Conventional Commit으로 feature에 commit한다.
-- feature를 push하고 base `develop` PR을 만든다.
-- CI와 review finding을 확인하고 실패 시 feature에서 수정한다.
-- 필수 check가 모두 통과하면 담당 에이전트가 squash merge하고 remote feature를 삭제한다.
+- 기능·버그·문서·도구·규칙 feature를 push하고 base `develop` PR을 만든다.
+- 로컬 필수 검사와 review finding을 확인하고 실패 시 feature에서 수정한다.
+- 로컬 필수 검사가 모두 통과하고 unresolved review finding이 0이면 담당 에이전트가 squash merge하고 remote
+  feature를 삭제한다.
 - local `develop`을 fast-forward한 뒤 merge SHA와 검사 결과를 보고한다.
 
 ## 4. Git 명령 계약
@@ -93,13 +94,13 @@ git switch -c feature/<SPEC-ID>
 
 git push -u origin feature/<SPEC-ID>
 gh pr create --base develop --head feature/<SPEC-ID>
-gh pr checks --watch
 gh pr merge --squash --delete-branch
 git switch develop
 git pull --ff-only origin develop
 ```
 
 - `main`, `develop` 직접 commit/push 금지
+- 일반 작업 PR의 base는 항상 `develop`, head는 항상 `feature/*`
 - `feature/* → main` PR 금지
 - merge commit보다 squash merge 우선
 - force push, history rewrite와 destructive reset 금지
@@ -110,7 +111,7 @@ git pull --ff-only origin develop
 “자동”은 검증을 생략하거나 무조건 merge한다는 뜻이 아니다. 에이전트가 다음 책임을 끝까지 수행한다는 뜻이다.
 
 1. PR 생성
-2. check 대기
+2. 로컬 필수 검사 결과 확인
 3. 실패 수정
 4. unresolved review finding 0 확인
 5. merge 실행
@@ -158,7 +159,7 @@ git pull --ff-only origin develop
 
 - SPEC과 영향 문서가 현재 동작을 설명한다.
 - 수용 기준이 코드와 검사로 추적된다.
-- Q1 필수 검사와 범위에 필요한 Q2~Q5가 통과한다.
+- Q1 필수 검사와 범위에 필요한 Q2~Q4가 통과한다.
 - 부모 저장소의 이름·도메인·식별자 흔적이 없다.
 - feature PR이 `develop`에 merge됐다.
 - local branch가 최신 `develop`이고 worktree가 깨끗하다.
