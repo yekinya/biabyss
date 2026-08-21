@@ -9,6 +9,7 @@ export const cellVertexShader = /* glsl */ `
   attribute float aDrive;
   attribute float aRearCatch;
   attribute float aAbsorption;
+  attribute float aFeeding;
   attribute vec3 aColor;
 
   varying vec2 vUv;
@@ -20,6 +21,7 @@ export const cellVertexShader = /* glsl */ `
   varying float vDrive;
   varying float vRearCatch;
   varying float vAbsorption;
+  varying float vFeeding;
   varying vec3 vColor;
 
   void main() {
@@ -32,6 +34,7 @@ export const cellVertexShader = /* glsl */ `
     vDrive = aDrive;
     vRearCatch = aRearCatch;
     vAbsorption = aAbsorption;
+    vFeeding = aFeeding;
     vColor = aColor;
     vec4 transformed = vec4(position, 1.0);
     #ifdef USE_INSTANCING
@@ -53,9 +56,11 @@ export const cellFragmentShader = /* glsl */ `
   varying float vDrive;
   varying float vRearCatch;
   varying float vAbsorption;
+  varying float vFeeding;
   varying vec3 vColor;
   uniform float uTime;
   uniform float uOpticalStage;
+  uniform float uPlaneOverscan;
 
   const float PI = 3.14159265359;
   const float TAU = 6.28318530718;
@@ -135,12 +140,52 @@ export const cellFragmentShader = /* glsl */ `
     return min(min(leftCell, rightCell), bridge);
   }
 
+  float streptococcusDistance(vec2 p) {
+    float chain = 10.0;
+    for (int beadIndex = 0; beadIndex < 5; beadIndex++) {
+      float index = float(beadIndex);
+      vec2 center = vec2(-0.58 + index * 0.29, sin(index * 0.9 + vPhase) * 0.1);
+      chain = min(chain, length(p - center) - 0.18);
+    }
+    return chain;
+  }
+
+  float spirillumDistance(vec2 p) {
+    float spiral = 10.0;
+    for (int segmentIndex = 0; segmentIndex < 6; segmentIndex++) {
+      float index = float(segmentIndex);
+      float nextIndex = index + 1.0;
+      vec2 start = vec2(-0.66 + index * 0.22, sin(index * 1.7 + vPhase) * 0.17);
+      vec2 end = vec2(-0.66 + nextIndex * 0.22, sin(nextIndex * 1.7 + vPhase) * 0.17);
+      spiral = min(spiral, segmentDistance(p, start, end) - 0.095);
+    }
+    float tailWave = sin(vGaitPhase * TAU + vPhase) * 0.1;
+    float frontTail = segmentDistance(p, vec2(0.44, 0.13), vec2(0.98, tailWave)) - 0.025;
+    float rearTail = segmentDistance(p, vec2(-0.66, 0.0), vec2(-1.02, -tailWave)) - 0.025;
+    return min(spiral, min(frontTail, rearTail));
+  }
+
+  float radiolarianDistance(vec2 p) {
+    float capsule = length(p) - 0.42;
+    float spines = 10.0;
+    for (int spineIndex = 0; spineIndex < 8; spineIndex++) {
+      float angle = float(spineIndex) * TAU / 8.0 + vPhase * 0.08;
+      vec2 direction = vec2(cos(angle), sin(angle));
+      float spine = segmentDistance(p, direction * 0.34, direction * 0.76) - 0.028;
+      spines = min(spines, spine);
+    }
+    return min(capsule, spines);
+  }
+
   float shapeDistance(vec2 p) {
     if (vMorph < 0.5) return micrococcusDistance(p);
     if (vMorph < 1.5) return ciliophoranDistance(p);
     if (vMorph < 2.5) return larvoidDistance(p);
     if (vMorph < 3.5) return tentacleAmoebaDistance(p);
     if (vMorph < 4.5) return diplococcusDistance(p);
+    if (vMorph < 5.5) return streptococcusDistance(p);
+    if (vMorph < 6.5) return spirillumDistance(p);
+    if (vMorph < 7.5) return radiolarianDistance(p);
     return ellipseDistance(p, vec2(0.70, 1.28), 0.72);
   }
 
@@ -153,7 +198,7 @@ export const cellFragmentShader = /* glsl */ `
   }
 
   void main() {
-    vec2 p = (vUv - 0.5) * 2.0;
+    vec2 p = (vUv - 0.5) * 2.0 * uPlaneOverscan;
     float t = uTime * 0.075 + vPhase;
     float frontMask = smoothstep(-0.38, 0.68, p.x);
     float frontStretch = 1.0 + vFrontReach * 0.07;
@@ -226,6 +271,7 @@ export const cellFragmentShader = /* glsl */ `
     color = mix(color, membraneColor, rim * (0.82 + vThreat * 0.12));
     color += outerHalo * vec3(0.08, 0.085, 0.08);
     color = mix(color, membraneColor * 0.62, vAbsorption * 0.2);
+    color = mix(color, bodyColor * 1.04, vFeeding * inner * 0.08);
 
     float alpha = body * (0.48 + rim * 0.38 + granuleShape * 0.08) + outerHalo * 0.07;
     alpha *= 1.0 - vAbsorption * 0.18;

@@ -1,9 +1,11 @@
 // @ts-check
 
 import { canAbsorb, radiusForMass } from '../domain/rules/mass.js'
-import { aggroIntent } from '../domain/rules/npcBehavior.js'
+import { aggroIntent, selectAggroTarget } from '../domain/rules/npcBehavior.js'
+import { nutrientRadius } from '../domain/rules/nutrient.js'
 import { advanceGait, sampleGait } from '../domain/rules/gait.js'
 import { RULE_SET } from '../domain/rules/ruleSet.js'
+import { CellSpatialIndex } from './CellSpatialIndex.js'
 import { SeededRandom, stratifiedPositions } from './random.js'
 
 /** @typedef {'idle' | 'running' | 'paused' | 'game-over'} RunPhase */
@@ -19,7 +21,7 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  * @property {number} vx
  * @property {number} vy
  * @property {number} mass
- * @property {'player' | 'micrococcus' | 'ciliophoran' | 'larvoid' | 'tentacle-amoeba' | 'diplococcus'} speciesId
+ * @property {'player' | 'micrococcus' | 'ciliophoran' | 'larvoid' | 'tentacle-amoeba' | 'diplococcus' | 'streptococcus' | 'spirillum' | 'radiolarian'} speciesId
  * @property {number} phase
  * @property {number} heading
  * @property {number} morph
@@ -30,6 +32,10 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  * @property {string | undefined} absorbedBy
  * @property {number} previousAbsorptionProgress
  * @property {number} absorptionProgress
+ * @property {number} previousFeedingProgress
+ * @property {number} feedingProgress
+ * @property {string | undefined} targetId
+ * @property {number} nextDecisionTick
  */
 
 /**
@@ -37,7 +43,6 @@ import { SeededRandom, stratifiedPositions } from './random.js'
  * @property {string} predatorId
  * @property {string} preyId
  * @property {number} elapsedSeconds
- * @property {number} durationSeconds
  * @property {number} startPreyMass
  * @property {number} transferredMass
  */
@@ -79,12 +84,6 @@ function turnToward(current, target, maximumDelta) {
   return current + Math.max(-maximumDelta, Math.min(maximumDelta, delta))
 }
 
-/** @param {number} value */
-function smoothstep(value) {
-  const clamped = Math.max(0, Math.min(1, value))
-  return clamped * clamped * (3 - 2 * clamped)
-}
-
 export class Simulation {
   /** @param {number} viewportWidth @param {number} viewportHeight @param {number} [seed] */
   constructor(viewportWidth, viewportHeight, seed = 0x0b1a7b55) {
@@ -100,16 +99,22 @@ export class Simulation {
     this.viewportHeight = Math.max(320, viewportHeight)
     this.worldWidth = this.viewportWidth * RULE_SET.world.viewportSpanMultiplier
     this.worldHeight = this.viewportHeight * RULE_SET.world.viewportSpanMultiplier
+    this.cellSpatialIndex = new CellSpatialIndex(RULE_SET.npc.spatialCellSize, this.worldWidth)
+    /** @type {CellState[]} */
+    this.spatialCandidates = []
     this.invulnerableUntil = RULE_SET.player.startProtectionMs / 1000
     this.input = { x: this.worldWidth / 2, y: this.worldHeight / 2, strength: 0, active: false }
     /** @type {SimulationEvent[]} */
     this.events = []
     /** @type {CellState[]} */
     this.cells = []
+    /** @type {Map<string, CellState>} */
+    this.cellLookup = new Map()
     /** @type {NutrientState[]} */
     this.nutrients = []
     /** @type {AbsorptionState[]} */
     this.activeAbsorptions = []
+    this.busyCellIds = new Set()
     /** @type {CellState} */
     this.player = this.createPlayer()
     this.buildField()
@@ -132,7 +137,7 @@ export class Simulation {
       speciesId: 'player',
       phase: this.random.between(0, TAU),
       heading: 0,
-      morph: 5,
+      morph: 8,
       hue: 0.49,
       previousGaitPhase: 0,
       gaitPhase: 0,
@@ -140,6 +145,10 @@ export class Simulation {
       absorbedBy: undefined,
       previousAbsorptionProgress: 0,
       absorptionProgress: 0,
+      previousFeedingProgress: 0,
+      feedingProgress: 0,
+      targetId: undefined,
+      nextDecisionTick: 0,
     }
   }
 
@@ -167,10 +176,12 @@ export class Simulation {
       id: `nutrient-${index}`,
       x: position.x,
       y: position.y,
-      mass: RULE_SET.nutrient.mass,
+      mass: this.random.between(RULE_SET.nutrient.massMin, RULE_SET.nutrient.massMax),
       phase: this.random.between(0, TAU),
       hue: index % 4 === 0 ? 0.74 : this.random.between(0.45, 0.57),
     }))
+    this.cellLookup = new Map(this.cells.map((cell) => [cell.id, cell]))
+    this.cellSpatialIndex.rebuild(this.cells)
   }
 
   /** @param {{x: number, y: number}} position */
@@ -214,13 +225,19 @@ export class Simulation {
       phase: this.random.between(0, TAU),
       heading,
       morph: archetype.morph,
-      hue: [0.31, 0.18, 0.13, 0.06, 0.23][index % RULE_SET.npc.archetypes.length],
+      hue: [0.31, 0.18, 0.13, 0.06, 0.23, 0.28, 0.46, 0.09][
+        index % RULE_SET.npc.archetypes.length
+      ],
       previousGaitPhase: gaitPhase,
       gaitPhase,
       gaitCycle: index,
       absorbedBy: undefined,
       previousAbsorptionProgress: 0,
       absorptionProgress: 0,
+      previousFeedingProgress: 0,
+      feedingProgress: 0,
+      targetId: undefined,
+      nextDecisionTick: index % RULE_SET.npc.decisionIntervalTicks,
     }
   }
 
@@ -243,6 +260,7 @@ export class Simulation {
     this.invulnerableUntil = RULE_SET.player.startProtectionMs / 1000
     this.events.length = 0
     this.activeAbsorptions.length = 0
+    this.busyCellIds.clear()
     this.player = this.createPlayer()
     this.input = { x: this.player.x, y: this.player.y, strength: 0, active: false }
     this.buildField()
@@ -273,9 +291,11 @@ export class Simulation {
     this.tick += 1
     this.elapsed += dtSeconds
     this.rememberPositions()
+    this.cellSpatialIndex.rebuild(this.cells)
     this.movePlayer(dtSeconds)
     this.moveNpcs(dtSeconds)
     if (this.updateAbsorptions(dtSeconds)) return
+    this.cellSpatialIndex.rebuild(this.cells)
     this.consumeNutrients()
     this.resolveCellContacts()
     this.score = Math.floor((this.player.mass - RULE_SET.player.initialMass) * 10 + this.elapsed * 2)
@@ -293,6 +313,7 @@ export class Simulation {
       cell.previousY = cell.y
       cell.previousGaitPhase = cell.gaitPhase
       cell.previousAbsorptionProgress = cell.absorptionProgress
+      cell.previousFeedingProgress = cell.feedingProgress
     }
   }
 
@@ -338,7 +359,10 @@ export class Simulation {
           dt
       this.limitVelocity(
         player,
-        RULE_SET.player.maxSpeed * (0.35 + inputStrength * 0.65) * massFactor,
+        RULE_SET.player.maxSpeed *
+          RULE_SET.gait.movementSpeedMultiplier *
+          (0.35 + inputStrength * 0.65) *
+          massFactor,
       )
     } else {
       player.gaitPhase = 0
@@ -355,10 +379,46 @@ export class Simulation {
       const npc = this.cells[index]
       if (npc.absorbedBy) continue
       const archetype = this.archetypeFor(npc)
-      const dx = this.player.x - npc.x
-      const dy = this.player.y - npc.y
-      const distance = Math.max(1, Math.hypot(dx, dy))
-      const aggroDirection = aggroIntent(archetype, distance)
+      let steeringTarget = this.cellById(npc.targetId)
+      if (
+        steeringTarget &&
+        !selectAggroTarget(archetype, npc, [steeringTarget])
+      ) {
+        npc.targetId = undefined
+        steeringTarget = undefined
+      }
+
+      if (
+        (archetype.aggro === 'pursue-player' || archetype.aggro === 'pursue-cell') &&
+        this.tick >= npc.nextDecisionTick
+      ) {
+        const candidates = /** @type {CellState[]} */ (
+          this.cellSpatialIndex.query(
+            npc.x,
+            npc.y,
+            archetype.aggroRadius,
+            this.spatialCandidates,
+          )
+        )
+        steeringTarget = /** @type {CellState | undefined} */ (
+          selectAggroTarget(archetype, npc, candidates)
+        )
+        npc.targetId = steeringTarget?.id
+        npc.nextDecisionTick = this.tick + RULE_SET.npc.decisionIntervalTicks
+      }
+
+      let aggroDirection = 0
+      let dx = this.player.x - npc.x
+      let dy = this.player.y - npc.y
+      let distance = Math.max(1, Math.hypot(dx, dy))
+      if (steeringTarget) {
+        dx = steeringTarget.x - npc.x
+        dy = steeringTarget.y - npc.y
+        distance = Math.max(1, Math.hypot(dx, dy))
+        aggroDirection = aggroIntent(archetype, distance, true)
+      } else if (archetype.aggro === 'flee') {
+        aggroDirection = aggroIntent(archetype, distance)
+      }
 
       if (aggroDirection !== 0) {
         const targetHeading = Math.atan2(dy * aggroDirection, dx * aggroDirection)
@@ -379,7 +439,8 @@ export class Simulation {
           archetype.locomotion === 'drift'
             ? 0.72 + Math.sin(this.elapsed + npc.phase) * 0.18
             : 1
-        const targetSpeed = archetype.maxSpeed * driftPulse
+        const targetSpeed =
+          archetype.maxSpeed * RULE_SET.gait.movementSpeedMultiplier * driftPulse
         const velocityBlend =
           1 - Math.exp(-(archetype.locomotion === 'constant' ? 8 : 1.8) * dt)
         npc.vx += (directionX * targetSpeed - npc.vx) * velocityBlend
@@ -408,7 +469,10 @@ export class Simulation {
           gait.drive *
           massFactor *
           dt
-      this.limitVelocity(npc, archetype.maxSpeed * massFactor)
+      this.limitVelocity(
+        npc,
+        archetype.maxSpeed * RULE_SET.gait.movementSpeedMultiplier * massFactor,
+      )
       this.integrate(npc, dt)
     }
   }
@@ -417,7 +481,12 @@ export class Simulation {
     if (this.player.absorbedBy) return
     const playerRadius = radiusForMass(this.player.mass)
     for (const nutrient of this.nutrients) {
-      if (Math.hypot(nutrient.x - this.player.x, nutrient.y - this.player.y) > playerRadius + 6) continue
+      if (
+        Math.hypot(nutrient.x - this.player.x, nutrient.y - this.player.y) >
+        playerRadius + nutrientRadius(nutrient.mass)
+      ) {
+        continue
+      }
 
       const gain = nutrient.mass * RULE_SET.mass.nutrientEfficiency
       this.player.mass = Math.min(RULE_SET.mass.maximum, this.player.mass + gain)
@@ -428,21 +497,43 @@ export class Simulation {
   }
 
   resolveCellContacts() {
-    if (this.elapsed < this.invulnerableUntil || this.player.absorbedBy) return
+    const maximumRadius = radiusForMass(RULE_SET.mass.maximum)
+    /** @type {{first: CellState, second: CellState}[]} */
+    const contacts = []
 
-    for (let index = 1; index < this.cells.length; index += 1) {
-      const npc = this.cells[index]
-      if (npc.absorbedBy || this.isCellBusy(npc.id)) continue
-      const contact =
-        radiusForMass(this.player.mass) + radiusForMass(npc.mass) * RULE_SET.mass.contactDepthRatio
-      if (Math.hypot(npc.x - this.player.x, npc.y - this.player.y) > contact) continue
-
-      if (canAbsorb(this.player.mass, npc.mass)) {
-        if (!this.isCellBusy(this.player.id)) this.startAbsorption(this.player, npc)
-      } else if (canAbsorb(npc.mass, this.player.mass)) {
-        if (!this.isCellBusy(this.player.id)) this.startAbsorption(npc, this.player)
-        return
+    for (const first of this.cells) {
+      if (first.absorbedBy || this.isCellBusy(first.id)) continue
+      const candidates = /** @type {CellState[]} */ (
+        this.cellSpatialIndex.query(
+          first.x,
+          first.y,
+          radiusForMass(first.mass) + maximumRadius,
+          this.spatialCandidates,
+        )
+      )
+      for (const second of candidates) {
+        if (first.id >= second.id || second.absorbedBy || this.isCellBusy(second.id)) continue
+        if (
+          this.elapsed < this.invulnerableUntil &&
+          (first.kind === 'player' || second.kind === 'player')
+        ) {
+          continue
+        }
+        const contactDistance = radiusForMass(first.mass) + radiusForMass(second.mass)
+        if (Math.hypot(second.x - first.x, second.y - first.y) > contactDistance) continue
+        contacts.push({ first, second })
       }
+    }
+
+    contacts.sort((left, right) => {
+      if (left.first.id !== right.first.id) return left.first.id < right.first.id ? -1 : 1
+      return left.second.id < right.second.id ? -1 : left.second.id > right.second.id ? 1 : 0
+    })
+
+    for (const { first, second } of contacts) {
+      if (this.isCellBusy(first.id) || this.isCellBusy(second.id)) continue
+      if (canAbsorb(first.mass, second.mass)) this.startAbsorption(first, second)
+      else if (canAbsorb(second.mass, first.mass)) this.startAbsorption(second, first)
     }
   }
 
@@ -453,19 +544,42 @@ export class Simulation {
       const predator = this.cellById(state.predatorId)
       const prey = this.cellById(state.preyId)
       if (!predator || !prey) {
+        this.busyCellIds.delete(state.predatorId)
+        this.busyCellIds.delete(state.preyId)
         this.activeAbsorptions.splice(index, 1)
         continue
       }
 
       state.elapsedSeconds += dt
-      const progress = this.clamp(state.elapsedSeconds / state.durationSeconds, 0, 1)
-      const easedProgress = smoothstep(progress)
-      const desiredTransfer =
-        state.startPreyMass * RULE_SET.mass.cellEfficiency * easedProgress
-      const gainedMass = Math.max(0, desiredTransfer - state.transferredMass)
-      state.transferredMass = desiredTransfer
+      const predatorRadius = radiusForMass(predator.mass)
+      const preyRadius = radiusForMass(prey.mass)
+      const distance = Math.hypot(predator.x - prey.x, predator.y - prey.y)
+      const overlapDepth = Math.max(0, predatorRadius + preyRadius - distance)
+      const overlapRatio = this.clamp(overlapDepth / Math.max(preyRadius * 2, 0.001), 0, 1)
+      const contactFactor = Math.max(
+        RULE_SET.mass.absorptionMinimumContactFactor,
+        overlapRatio,
+      )
+      const availableMass = Math.max(0, prey.mass - RULE_SET.mass.absorptionMinimumMass)
+      const damageMass = Math.min(
+        availableMass,
+        state.startPreyMass *
+          RULE_SET.mass.absorptionDamageFractionPerSecond *
+          contactFactor *
+          dt,
+      )
+      prey.mass = Math.max(RULE_SET.mass.absorptionMinimumMass, prey.mass - damageMass)
+      const gainedMass = damageMass * RULE_SET.mass.cellEfficiency
+      state.transferredMass += gainedMass
       predator.mass = Math.min(RULE_SET.mass.maximum, predator.mass + gainedMass)
+      const drainableMass = Math.max(
+        Number.EPSILON,
+        state.startPreyMass - RULE_SET.mass.absorptionMinimumMass,
+      )
+      const progress = this.clamp((state.startPreyMass - prey.mass) / drainableMass, 0, 1)
       prey.absorptionProgress = progress
+      predator.feedingProgress = Math.sin(progress * Math.PI)
+      predator.heading = Math.atan2(prey.y - predator.y, prey.x - predator.x)
       prey.vx = 0
       prey.vy = 0
       prey.heading = Math.atan2(predator.y - prey.y, predator.x - prey.x)
@@ -473,7 +587,12 @@ export class Simulation {
       prey.x += (predator.x - prey.x) * pull
       prey.y += (predator.y - prey.y) * pull
 
-      if (progress < 1) continue
+      if (prey.mass > RULE_SET.mass.absorptionMinimumMass + Number.EPSILON) continue
+      prey.mass = RULE_SET.mass.absorptionMinimumMass
+      prey.absorptionProgress = 1
+      predator.feedingProgress = 0
+      this.busyCellIds.delete(predator.id)
+      this.busyCellIds.delete(prey.id)
       this.activeAbsorptions.splice(index, 1)
       if (prey.kind === 'player') {
         this.phase = 'game-over'
@@ -495,17 +614,22 @@ export class Simulation {
 
   /** @param {CellState} predator @param {CellState} prey */
   startAbsorption(predator, prey) {
-    if (prey.absorbedBy || this.isCellBusy(predator.id)) return
+    if (prey.absorbedBy || this.isCellBusy(predator.id) || this.isCellBusy(prey.id)) return
     prey.absorbedBy = predator.id
     prey.absorptionProgress = 0
     prey.previousAbsorptionProgress = 0
     prey.vx = 0
     prey.vy = 0
+    predator.heading = Math.atan2(prey.y - predator.y, prey.x - predator.x)
+    predator.feedingProgress = 0
+    predator.targetId = undefined
+    prey.targetId = undefined
+    this.busyCellIds.add(predator.id)
+    this.busyCellIds.add(prey.id)
     this.activeAbsorptions.push({
       predatorId: predator.id,
       preyId: prey.id,
       elapsedSeconds: 0,
-      durationSeconds: RULE_SET.mass.absorptionDurationSeconds,
       startPreyMass: prey.mass,
       transferredMass: 0,
     })
@@ -513,14 +637,13 @@ export class Simulation {
 
   /** @param {string} id */
   isCellBusy(id) {
-    return this.activeAbsorptions.some(
-      (state) => state.predatorId === id || state.preyId === id,
-    )
+    return this.busyCellIds.has(id)
   }
 
-  /** @param {string} id */
+  /** @param {string | undefined} id */
   cellById(id) {
-    return this.cells.find((cell) => cell.id === id)
+    if (!id) return undefined
+    return this.cellLookup.get(id)
   }
 
   /** @param {CellState} cell */
@@ -534,8 +657,9 @@ export class Simulation {
   respawnNutrient(nutrient) {
     nutrient.x = this.random.between(20, this.worldWidth - 20)
     nutrient.y = this.random.between(20, this.worldHeight - 20)
-    nutrient.mass = RULE_SET.nutrient.mass
+    nutrient.mass = this.random.between(RULE_SET.nutrient.massMin, RULE_SET.nutrient.massMax)
     nutrient.phase = this.random.between(0, TAU)
+    nutrient.hue = this.random.between(0.45, 0.57)
   }
 
   /** @param {CellState} npc */
@@ -560,6 +684,10 @@ export class Simulation {
     npc.absorbedBy = undefined
     npc.previousAbsorptionProgress = 0
     npc.absorptionProgress = 0
+    npc.previousFeedingProgress = 0
+    npc.feedingProgress = 0
+    npc.targetId = undefined
+    npc.nextDecisionTick = this.tick + RULE_SET.npc.decisionIntervalTicks
   }
 
   /** @param {CellState} cell @param {number} dt @param {number} frequency */

@@ -38,9 +38,12 @@
 Cell은 공유 PlaneGeometry와 종류별 공유 ShaderMaterial을 사용한다. 개별 blur filter를 붙이지 않고 화면 전체
 `EffectComposer`는 얇은 현미경 halo가 뭉개지지 않는 최소 강도로만 사용한다.
 
-Player와 5종 NPC를 하나의 instanced cell shader로 그린다. 미립구균은 좁쌀형 타원, 섬모편모충은 가장자리
+Player와 8종 NPC를 하나의 instanced cell shader로 그린다. 미립구균은 좁쌀형 타원, 섬모편모충은 가장자리
 섬모와 짧은 꼬리, 다족유생충은 긴 체절과 양옆 다리, 촉수아메바는 불규칙 몸통과 방사 촉수, 쌍구균은 가운데가
-잘록한 아령형 쌍구체로 구분한다. 실제 종 재현을 주장하지 않고 현미경 관찰 형태 언어만 사용한다.
+잘록한 아령형 쌍구체로 구분한다. 연쇄구균은 휘어진 작은 구체 사슬, 나선편모충은 파형 몸통과 양끝 편모,
+방산포자충은 중심 포낭과 짧은 방사 돌기로 구분한다. 실제 종 재현을 주장하지 않고 현미경 관찰 형태 언어만
+사용한다. Plane은 형태 최대 SDF와 halo보다 35% 큰 overscan을 두어 reach·꼬리·흡수 신장에서 가장자리가
+잘리지 않게 한다.
 
 ## 4. 유기적 움직임
 
@@ -52,8 +55,9 @@ Player와 5종 NPC를 하나의 instanced cell shader로 그린다. 미립구균
 - 내부 관성: Cell 회전과 독립적으로 늦게 따라오는 offset
 - 쌍이동축: 별도 시간 애니메이션이 아니라 `gaitPhase`로 벌어지고 가까워지며 실제 추진 펄스와 일치
 - heartbeat: gameplay 판정과 무관한 작은 scale 변화
-- 흡수: 0.72초 동안 prey가 predator 쪽으로 끌려가며 길게 늘고 가늘어져 빨려 들어간다. 크기 0 전까지
-  즉시 숨기지 않고 진행률에 따라 축소하며, 완료 순간에만 입자 burst와 respawn/게임오버를 적용한다.
+- 흡수: 외곽 접촉부터 prey 실제 Mass가 겹침 깊이에 비례해 줄고 predator 실제 Mass가 효율만큼 늘어난다.
+  prey는 predator 쪽으로 끌려가며 길고 가늘게 줄어들고 predator는 prey 방향으로 미세하게 신장한다. 중심이
+  겹쳐도 한 frame에 숨기지 않으며 최소 Mass 도달 순간에만 입자 burst와 respawn/게임오버를 적용한다.
 - 사망: 즉시 사라지지 않고 외곽 붕괴 → 빛 소실 → 입자 분산 순서, 전체 600ms 이하
 - 이동 trail: 진행 반대쪽에서 점액성 point가 방출되고 수명 동안 크기와 alpha가 함께 감소
 
@@ -76,7 +80,8 @@ catch에서 뒤쪽 과립이 지연되어 회수된다. 액포는 세포질 안�
 - Stage 3 `detritus-deep`: 회녹 배지, 올리브·갈색 detritus, 짙은 작은 입자와 불규칙 덩어리.
 - 배경은 bitmap을 반복하지 않고 4 octave 이하 noise와 domain warp를 하나의 field shader에서 계산한다.
 - Stage는 Player Mass 성장률에서 연속 보간하는 Presentation 값이며 gameplay 판정에는 사용하지 않는다.
-- Mass 1 Nutrient는 작은 회녹·황록 점으로 3200개를 균일 배치하고 중심이 밝은 짧은 pulse로 유기물임을 표시한다.
+- Mass 1~6 Nutrient는 회녹·황록 점으로 9600개를 균일 배치한다. 기존 최소 크기보다 point 기본 크기를 키우고
+  Mass의 제곱근에 따라 서로 다른 크기로 그리며 중심이 밝은 짧은 pulse로 유기물임을 표시한다.
 
 ## 7. 후처리 예산
 

@@ -2,6 +2,7 @@
 
 import * as THREE from 'three'
 import { interpolateGaitPhase, sampleGait } from '../../domain/rules/gait.js'
+import { nutrientPointSize } from '../../domain/rules/nutrient.js'
 import { RULE_SET } from '../../domain/rules/ruleSet.js'
 import { particleFragmentShader, particleVertexShader } from './shaders/particleShader.js'
 
@@ -109,9 +110,10 @@ export class NutrientParticles {
     for (let index = 0; index < simulation.nutrients.length; index += 1) {
       const nutrient = simulation.nutrients[index]
       const pulse = 0.78 + Math.sin(time * 2.1 + nutrient.phase) * 0.18
+      const size = nutrientPointSize(nutrient.mass)
       const stageHue = THREE.MathUtils.lerp(0.31, 0.16, opticalStage / 2)
       this.color.setHSL(stageHue + (nutrient.hue - 0.5) * 0.08, 0.62, 0.62)
-      this.buffer.set(index, nutrient.x, nutrient.y, 1, 3.8 * pulse, 0.38, this.color)
+      this.buffer.set(index, nutrient.x, nutrient.y, 1, size * pulse, 0.34, this.color)
     }
     this.buffer.commit()
   }
