@@ -1,11 +1,43 @@
 // @ts-check
 
 export const cellVertexShader = /* glsl */ `
+  attribute float aPhase;
+  attribute float aMorph;
+  attribute float aThreat;
+  attribute float aGaitPhase;
+  attribute float aFrontReach;
+  attribute float aDrive;
+  attribute float aRearCatch;
+  attribute float aAbsorption;
+  attribute vec3 aColor;
+
   varying vec2 vUv;
+  varying float vPhase;
+  varying float vMorph;
+  varying float vThreat;
+  varying float vGaitPhase;
+  varying float vFrontReach;
+  varying float vDrive;
+  varying float vRearCatch;
+  varying float vAbsorption;
+  varying vec3 vColor;
 
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vPhase = aPhase;
+    vMorph = aMorph;
+    vThreat = aThreat;
+    vGaitPhase = aGaitPhase;
+    vFrontReach = aFrontReach;
+    vDrive = aDrive;
+    vRearCatch = aRearCatch;
+    vAbsorption = aAbsorption;
+    vColor = aColor;
+    vec4 transformed = vec4(position, 1.0);
+    #ifdef USE_INSTANCING
+      transformed = instanceMatrix * transformed;
+    #endif
+    gl_Position = projectionMatrix * modelViewMatrix * transformed;
   }
 `
 
@@ -13,15 +45,20 @@ export const cellFragmentShader = /* glsl */ `
   precision highp float;
 
   varying vec2 vUv;
+  varying float vPhase;
+  varying float vMorph;
+  varying float vThreat;
+  varying float vGaitPhase;
+  varying float vFrontReach;
+  varying float vDrive;
+  varying float vRearCatch;
+  varying float vAbsorption;
+  varying vec3 vColor;
   uniform float uTime;
-  uniform float uPhase;
-  uniform float uMorph;
-  uniform float uThreat;
-  uniform float uFrontReach;
-  uniform float uDrive;
-  uniform float uRearCatch;
   uniform float uOpticalStage;
-  uniform vec3 uColor;
+
+  const float PI = 3.14159265359;
+  const float TAU = 6.28318530718;
 
   float hash21(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
@@ -40,33 +77,71 @@ export const cellFragmentShader = /* glsl */ `
     );
   }
 
-  float ellipse(vec2 p, vec2 scale) {
-    return length(p * scale);
+  float ellipseDistance(vec2 p, vec2 scale, float radius) {
+    return length(p * scale) - radius;
   }
 
-  float capsule(vec2 p) {
-    vec2 q = vec2(max(abs(p.x) - 0.34, 0.0), p.y * 1.28);
-    return length(q) * 1.18;
+  float segmentDistance(vec2 p, vec2 a, vec2 b) {
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+    float projection = clamp(dot(pa, ba) / max(dot(ba, ba), 0.0001), 0.0, 1.0);
+    return length(pa - ba * projection);
   }
 
-  float metaballs(vec2 p, float spread) {
-    float a = 0.20 / (dot(p - vec2(spread, 0.0), p - vec2(spread, 0.0)) + 0.035);
-    float b = 0.20 / (dot(p + vec2(spread, 0.0), p + vec2(spread, 0.0)) + 0.035);
-    return a + b;
+  float micrococcusDistance(vec2 p) {
+    return ellipseDistance(p, vec2(0.72, 1.46), 0.68);
+  }
+
+  float ciliophoranDistance(vec2 p) {
+    float body = ellipseDistance(p + vec2(0.06, 0.0), vec2(0.72, 1.14), 0.67);
+    float tailWave = sin(vGaitPhase * TAU + vPhase) * 0.1;
+    float tail = segmentDistance(p, vec2(-0.48, 0.0), vec2(-0.96, tailWave)) - 0.035;
+    return min(body, tail);
+  }
+
+  float larvoidDistance(vec2 p) {
+    float body = segmentDistance(p, vec2(-0.55, 0.0), vec2(0.55, 0.0)) - 0.27;
+    float legs = 10.0;
+    for (int legIndex = 0; legIndex < 4; legIndex++) {
+      float index = float(legIndex);
+      float x = -0.45 + index * 0.3;
+      float legSwing = sin(vGaitPhase * TAU + index * PI) * 0.075;
+      float upper = segmentDistance(
+        p,
+        vec2(x, 0.18),
+        vec2(x - 0.1 + legSwing, 0.46)
+      ) - 0.027;
+      float lower = segmentDistance(
+        p,
+        vec2(x, -0.18),
+        vec2(x + 0.1 - legSwing, -0.46)
+      ) - 0.027;
+      legs = min(legs, min(upper, lower));
+    }
+    return min(body, legs);
+  }
+
+  float tentacleAmoebaDistance(vec2 p) {
+    float angle = atan(p.y, p.x);
+    float tendrils = pow(max(0.0, sin(angle * 5.0 + vGaitPhase * PI)), 7.0) * 0.24;
+    float secondary = sin(angle * 3.0 - vPhase) * 0.055;
+    return length(p) - (0.46 + tendrils + secondary + vFrontReach * 0.045);
+  }
+
+  float diplococcusDistance(vec2 p) {
+    float leftCell = length(p - vec2(-0.29, 0.0)) - 0.39;
+    float rightCell = length(p - vec2(0.29, 0.0)) - 0.39;
+    float bridge = segmentDistance(p, vec2(-0.24, 0.0), vec2(0.24, 0.0)) - 0.13;
+    return min(min(leftCell, rightCell), bridge);
   }
 
   float shapeDistance(vec2 p) {
-    if (uMorph < 0.5) return length(p);
-    if (uMorph < 1.5) return ellipse(p, vec2(0.70, 1.28));
-    if (uMorph < 2.5) return capsule(p);
-    if (uMorph < 3.5) return 1.0 / max(metaballs(p, 0.28), 0.001) * 2.38;
-    if (uMorph < 4.5) {
-      vec2 curved = vec2(p.x, p.y + 0.42 * (p.x * p.x - 0.18));
-      return ellipse(curved, vec2(0.76, 1.22));
-    }
-    float shapeAngle = atan(p.y, p.x);
-    float lobes = sin(shapeAngle * 3.0 + uPhase) * 0.055 + sin(shapeAngle * 5.0 - uPhase) * 0.025;
-    return length(p) - lobes;
+    if (vMorph < 0.5) return micrococcusDistance(p);
+    if (vMorph < 1.5) return ciliophoranDistance(p);
+    if (vMorph < 2.5) return larvoidDistance(p);
+    if (vMorph < 3.5) return tentacleAmoebaDistance(p);
+    if (vMorph < 4.5) return diplococcusDistance(p);
+    return ellipseDistance(p, vec2(0.70, 1.28), 0.72);
   }
 
   float vacuoleRing(vec2 p, vec2 center, float radius) {
@@ -79,23 +154,25 @@ export const cellFragmentShader = /* glsl */ `
 
   void main() {
     vec2 p = (vUv - 0.5) * 2.0;
-    float t = uTime * 0.075 + uPhase;
+    float t = uTime * 0.075 + vPhase;
     float frontMask = smoothstep(-0.38, 0.68, p.x);
-    float frontStretch = 1.0 + uFrontReach * 0.07;
-    float rearCompression = 1.0 + uRearCatch * 0.035;
+    float frontStretch = 1.0 + vFrontReach * 0.07;
+    float rearCompression = 1.0 + vRearCatch * 0.035;
     vec2 softP = vec2(
-      (p.x - (uFrontReach - uRearCatch) * 0.028) / mix(rearCompression, frontStretch, frontMask),
-      p.y * (1.0 + uDrive * 0.035)
+      (p.x - (vFrontReach - vRearCatch) * 0.028) /
+        mix(rearCompression, frontStretch, frontMask),
+      p.y * (1.0 + vDrive * 0.035)
     );
 
     float membraneGrain = noise(softP * 9.0 + vec2(t * 0.08, -t * 0.05));
     float membraneAngle = atan(softP.y, softP.x);
-    float cilia = sin(membraneAngle * 23.0 + uPhase * 2.0) * 0.006 +
+    float ciliaStrength = vMorph > 0.5 && vMorph < 1.5 ? 0.018 : 0.007;
+    float cilia = sin(membraneAngle * 27.0 + vGaitPhase * TAU) * ciliaStrength +
       (membraneGrain - 0.5) * 0.016;
-    float distanceToMembrane = shapeDistance(softP) + cilia - 0.72;
+    float distanceToMembrane = shapeDistance(softP) + cilia;
     float body = 1.0 - smoothstep(-0.018, 0.035, distanceToMembrane);
     float outerHalo = 1.0 - smoothstep(0.03, 0.085, abs(distanceToMembrane - 0.035));
-    float rim = 1.0 - smoothstep(0.008, 0.052 + uThreat * 0.018, abs(distanceToMembrane));
+    float rim = 1.0 - smoothstep(0.008, 0.052 + vThreat * 0.018, abs(distanceToMembrane));
     float inner = 1.0 - smoothstep(-0.31, -0.045, distanceToMembrane);
 
     float stage01 = smoothstep(0.18, 0.92, uOpticalStage);
@@ -105,16 +182,24 @@ export const cellFragmentShader = /* glsl */ `
       vec3(0.51, 0.51, 0.37),
       stage12
     );
-    vec3 membraneColor = mix(vec3(0.14, 0.16, 0.16), uColor, 0.42);
+    vec3 membraneColor = mix(vec3(0.14, 0.16, 0.16), vColor, 0.42);
     float cytoplasm = noise(softP * 5.4 + vec2(t * 0.09, -t * 0.06));
     vec3 color = bodyColor * (0.88 + cytoplasm * 0.14);
 
-    vec2 internalDrift = vec2(-uDrive * 0.035 + uRearCatch * 0.028, sin(t) * 0.008);
+    vec2 internalDrift = vec2(-vDrive * 0.035 + vRearCatch * 0.028, sin(t) * 0.008);
     vec2 organelleP = softP + internalDrift;
-    float frontAxisX = 0.03 + uFrontReach * 0.25;
-    float rearAxisX = -0.03 - uFrontReach * 0.08 + uRearCatch * 0.04;
-    float frontAxis = 1.0 - smoothstep(0.052, 0.145, length(organelleP - vec2(frontAxisX, 0.018)));
-    float rearAxis = 1.0 - smoothstep(0.05, 0.135, length(organelleP - vec2(rearAxisX, -0.018)));
+    float frontAxisX = 0.03 + vFrontReach * 0.25;
+    float rearAxisX = -0.03 - vFrontReach * 0.08 + vRearCatch * 0.04;
+    float frontAxis = 1.0 - smoothstep(
+      0.052,
+      0.145,
+      length(organelleP - vec2(frontAxisX, 0.018))
+    );
+    float rearAxis = 1.0 - smoothstep(
+      0.05,
+      0.135,
+      length(organelleP - vec2(rearAxisX, -0.018))
+    );
     float movementAxes = (frontAxis + rearAxis) * inner;
 
     float vacuoleA = vacuoleRing(organelleP, vec2(-0.2, 0.19), 0.12);
@@ -129,7 +214,7 @@ export const cellFragmentShader = /* glsl */ `
 
     vec2 granuleGrid = floor((organelleP + 0.8) * 13.0);
     vec2 granuleCell = fract((organelleP + 0.8) * 13.0) - 0.5;
-    float granuleSeed = hash21(granuleGrid + floor(uPhase * 11.0));
+    float granuleSeed = hash21(granuleGrid + floor(vPhase * 11.0));
     float granuleShape = (1.0 - smoothstep(0.075, 0.2, length(granuleCell))) *
       step(0.53, granuleSeed) * inner;
     float granuleDepth = 0.36 + granuleSeed * 0.5;
@@ -138,10 +223,12 @@ export const cellFragmentShader = /* glsl */ `
     color = mix(color, membraneColor * 0.72, vacuoleEdges * 0.62);
     color = mix(color, membraneColor * granuleDepth, granuleShape * 0.72);
     color = mix(color, membraneColor * 0.42, movementAxes * 0.88);
-    color = mix(color, membraneColor, rim * (0.82 + uThreat * 0.12));
+    color = mix(color, membraneColor, rim * (0.82 + vThreat * 0.12));
     color += outerHalo * vec3(0.08, 0.085, 0.08);
+    color = mix(color, membraneColor * 0.62, vAbsorption * 0.2);
 
     float alpha = body * (0.48 + rim * 0.38 + granuleShape * 0.08) + outerHalo * 0.07;
+    alpha *= 1.0 - vAbsorption * 0.18;
     if (alpha < 0.015) discard;
     gl_FragColor = vec4(color, alpha);
   }
